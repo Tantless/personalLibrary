@@ -1,51 +1,85 @@
 # Error Handling
 
-> How errors are handled in this project.
+> Error contracts for backend application services.
 
 ---
 
-## Overview
+## Scenario: Ingest Errors
 
-<!--
-Document your project's error handling conventions here.
+### 1. Scope / Trigger
 
-Questions to answer:
-- What error types do you define?
-- How are errors propagated?
-- How are errors logged?
-- How are errors returned to clients?
--->
+- Trigger: Changes to ingest input validation, parser failures, batch behavior, or interface error handling.
+- Principle: Single-file failures and directory item failures must be visible in the ingest report; directory item failures must not stop the rest of the batch.
 
-(To be filled by the team)
+### 2. Signatures
 
----
+Error classes:
 
-## Error Types
+```python
+IngestInputError(ValueError)
+IngestParseError(ValueError)
+```
 
-<!-- Custom error classes/types -->
+Report fields:
 
-(To be filled by the team)
+```python
+IngestReport.status                 # completed, skipped, completed_with_errors, failed
+IngestReport.succeeded              # list[IngestItemReport]
+IngestReport.skipped                # list[IngestItemReport]
+IngestReport.failed                 # list[IngestItemReport]
+IngestItemReport.error              # short reason, no source content
+```
 
----
+### 3. Contracts
 
-## Error Handling Patterns
+- `IngestInputError` covers invalid local path usage, unsupported source types, unsupported extensions, URLs, and ambiguous directory canonical keys.
+- `IngestParseError` covers invalid UTF-8, invalid JSONL, empty documents, and parser output with no chunks.
+- `ingest_source()` creates an `ingest_jobs` row before validating the input path existence so failed local path attempts are recorded.
+- Directory ingest catches per-file exceptions, rolls back that file, records a failed item, and continues.
+- Interface layers should return the report shape rather than hiding item failures.
 
-<!-- Try-catch patterns, error propagation -->
+### 4. Validation & Error Matrix
 
-(To be filled by the team)
+| Case | Expected behavior |
+|------|-------------------|
+| Missing path | Report status `failed`, one failed item |
+| URL-like path | Raise `IngestInputError` before filesystem access |
+| Unsupported single-file extension | Report status `failed`, one failed item |
+| Unsupported file inside directory | Report status `skipped` or `completed_with_errors`, skipped item |
+| Invalid UTF-8 file inside directory | Failed item, remaining files still ingest |
+| Duplicate content hash | Report status `skipped`, no new chunks |
 
----
+### 5. Good/Base/Bad Cases
 
-## API Error Responses
+Good:
 
-<!-- Standard error response format -->
+```python
+try:
+    item = service._ingest_file(...)
+    session.commit()
+except Exception as exc:
+    session.rollback()
+    failed.append(IngestItemReport(status="failed", error=str(exc)))
+```
 
-(To be filled by the team)
+Bad:
 
----
+```python
+for file_path in files:
+    service._ingest_file(file_path)  # one exception aborts the whole directory
+```
 
-## Common Mistakes
+### 6. Tests Required
 
-<!-- Error handling mistakes your team has made -->
+- `tests/test_ingest.py::test_ingest_directory_is_non_recursive_and_continues_after_file_failure`
+- Add a test whenever a new error status or input validation branch is introduced.
 
-(To be filled by the team)
+### 7. Wrong vs Correct
+
+#### Wrong
+
+Logging or returning full source content in an error message.
+
+#### Correct
+
+Return file path, status, and a short reason only.

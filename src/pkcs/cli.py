@@ -1,9 +1,11 @@
 import json
+from pathlib import Path
 
 import typer
 
 from pkcs.config import get_settings
 from pkcs.health import get_health_status
+from pkcs.ingest import IngestService
 
 app = typer.Typer(help="Personal Knowledge Context Server CLI")
 
@@ -16,9 +18,18 @@ def health() -> None:
 
 
 @app.command()
-def ingest() -> None:
-    """Placeholder for MVP ingest command."""
-    raise typer.BadParameter("ingest is not implemented in PR1")
+def ingest(
+    path: Path = typer.Argument(..., help="Local file or non-recursive directory to ingest."),
+    source_type: str = typer.Option("markdown_doc", "--source-type", help="markdown_doc or ai_conversation."),
+    canonical_key: str | None = typer.Option(None, "--canonical-key", help="Stable source key for single-file ingest."),
+) -> None:
+    """Ingest a local file or non-recursive directory."""
+    report = IngestService.from_settings(get_settings()).ingest_source(
+        path=path,
+        source_type=source_type,
+        canonical_key=canonical_key,
+    )
+    typer.echo(json.dumps(report.to_dict(), ensure_ascii=False))
 
 
 @app.command()
@@ -41,4 +52,3 @@ def context_pack() -> None:
 
 if __name__ == "__main__":
     app()
-

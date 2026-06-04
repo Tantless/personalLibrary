@@ -1,51 +1,79 @@
 # Logging Guidelines
 
-> How logging is done in this project.
+> Logging contracts for the local-first PKCS backend.
 
 ---
 
-## Overview
+## Scenario: Ingest Event Logging
 
-<!--
-Document your project's logging conventions here.
+### 1. Scope / Trigger
 
-Questions to answer:
-- What logging library do you use?
-- What are the log levels and when to use each?
-- What should be logged?
-- What should NOT be logged (PII, secrets)?
--->
+- Trigger: Changes to ingest, search, read_source, context_pack, or failure-path logging.
+- MVP privacy rule: Logs may include IDs, paths, status, counts, and short error summaries. Logs must not include full source content, chunks, quotes, secrets, or raw private text.
 
-(To be filled by the team)
+### 2. Signatures
 
----
+Logger usage:
 
-## Log Levels
+```python
+logger = logging.getLogger(__name__)
+logger.info("ingest_file_succeeded", extra={"event": "ingest_file_succeeded", ...})
+logger.exception("ingest_file_failed", extra={"event": "ingest_file_failed", ...})
+```
 
-<!-- When to use each level: debug, info, warn, error -->
+Current ingest events:
 
-(To be filled by the team)
+```text
+ingest_file_succeeded
+ingest_file_skipped
+ingest_file_failed
+```
 
----
+### 3. Contracts
 
-## Structured Logging
+- Include `event` in `extra` for machine-readable logs.
+- Include stable references when available: `source_id`, `version_id`, `source_type`, `chunks_created`.
+- For failures, include path and source_type, but not content.
+- `ingest_jobs.summary_json` is the durable MVP audit surface; logs are operational traces.
 
-<!-- Log format, required fields -->
+### 4. Validation & Error Matrix
 
-(To be filled by the team)
+| Logged field | Allowed? | Reason |
+|--------------|----------|--------|
+| `source_id`, `version_id` | Yes | Stable non-content refs |
+| `canonical_key` | Use care | May contain local paths; prefer DB report over logs |
+| Local path | Yes for local MVP, but no content | Needed to debug ingest |
+| Chunk content or quote | No | Private source material |
+| Secret/env values | No | Credential leak risk |
 
----
+### 5. Good/Base/Bad Cases
 
-## What to Log
+Good:
 
-<!-- Important events to log -->
+```python
+logger.info(
+    "ingest_file_succeeded",
+    extra={"event": "ingest_file_succeeded", "source_id": source_id, "chunks_created": chunks_created},
+)
+```
 
-(To be filled by the team)
+Bad:
 
----
+```python
+logger.info("ingested content", extra={"content": parsed_chunk.content})
+```
 
-## What NOT to Log
+### 6. Tests Required
 
-<!-- Sensitive data, PII, secrets -->
+- Behavior is primarily verified through `ingest_jobs.summary_json` in integration tests.
+- If log formatting becomes part of runtime configuration, add a focused logging formatter test.
 
-(To be filled by the team)
+### 7. Wrong vs Correct
+
+#### Wrong
+
+Using logs as the only ingest audit record.
+
+#### Correct
+
+Persist ingest outcome in `ingest_jobs`, and use logs for event traces.

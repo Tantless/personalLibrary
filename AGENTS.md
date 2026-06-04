@@ -34,7 +34,8 @@ This temporary block preserves only the confirmed MVP planning state. The detail
 
 * MVP PRD confirmed by user on 2026-06-04.
 * No open MVP decisions remain.
-* Next engineering step: run Trellis Phase 2 preparation for `.trellis/tasks/06-03-pkcs-mvp-m1-m2` before implementation.
+* PR1, PR2, and PR3 have been implemented, verified, and committed.
+* Next engineering step: PR4 PostgreSQL FTS `SearchProvider` and `search_knowledge`.
 * M3-M5 planning remains future work.
 
 ## Workflow Rule
@@ -81,9 +82,9 @@ Out of MVP scope:
 
 ## Execution Plan
 
-* PR1: scaffold, uv config, Docker Compose PostgreSQL, FastAPI health, FastMCP skeleton, Typer CLI skeleton
-* PR2: Alembic schema, required indexes, FTS GIN index, Raw Archive writer, source/version/chunk/citation repositories
-* PR3: AI conversation and Markdown/text ingest, structure-first chunking, duplicate/new-version behavior, ingest report
+* PR1: scaffold, uv config, Docker Compose PostgreSQL, FastAPI health, FastMCP skeleton, Typer CLI skeleton - completed
+* PR2: Alembic schema, required indexes, FTS GIN index, Raw Archive writer, source/version/chunk/citation repositories - completed
+* PR3: AI conversation and Markdown/text ingest, structure-first chunking, duplicate/new-version behavior, ingest report - completed
 * PR4: PostgreSQL FTS SearchProvider, title boost, filters, search result shape
 * PR5: `read_source` by `chunk_id` and source/version/locator, with optional `context_lines`
 * PR6: Context Pack v0 JSON + Markdown, evidence caps, Caveats, soft `budget_tokens`

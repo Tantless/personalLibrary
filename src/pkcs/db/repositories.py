@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -12,6 +13,14 @@ class SourceRepository:
 
     def get_by_canonical_key(self, canonical_key: str) -> Source | None:
         return self.session.scalar(select(Source).where(Source.canonical_key == canonical_key))
+
+    def get_version_by_hash(self, *, source_id: str, content_hash: str) -> SourceVersion | None:
+        return self.session.scalar(
+            select(SourceVersion).where(
+                SourceVersion.source_id == source_id,
+                SourceVersion.content_hash == content_hash,
+            )
+        )
 
     def create_source(
         self,
@@ -38,12 +47,17 @@ class SourceRepository:
         content_hash: str,
         file_path: str,
         raw_archive_path: str,
+        version_id: str | None = None,
         status: str = "imported",
         metadata_json: dict[str, Any] | None = None,
     ) -> SourceVersion:
         version_number = len(source.versions) + 1
         supersedes_version_id = source.current_version_id
+        version_kwargs: dict[str, Any] = {}
+        if version_id is not None:
+            version_kwargs["id"] = version_id
         version = SourceVersion(
+            **version_kwargs,
             source_id=source.id,
             version_number=version_number,
             content_hash=content_hash,
@@ -155,3 +169,17 @@ class IngestJobRepository:
         self.session.flush()
         return job
 
+    def finish_job(
+        self,
+        job: IngestJob,
+        *,
+        status: str,
+        summary_json: dict[str, Any],
+        error_message: str | None = None,
+    ) -> IngestJob:
+        job.status = status
+        job.summary_json = summary_json
+        job.error_message = error_message
+        job.completed_at = datetime.now(UTC)
+        self.session.flush()
+        return job

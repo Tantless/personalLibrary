@@ -226,6 +226,39 @@ Notes:
 * PR2 does not implement ingest parsing or search service behavior; it only creates the data layer needed by PR3 and PR4.
 * FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
 
+### PR3: Ingest Pipeline
+
+Status: completed locally on 2026-06-04.
+
+Delivered:
+
+* `IngestService` application workflow shared by CLI and MCP.
+* `ingest_source` FastMCP tool.
+* Functional `pkcs ingest` CLI command returning the stable ingest report shape.
+* Markdown/text parser for `markdown_doc` with heading_path metadata and line locators.
+* AI conversation parser for Markdown/transcript and JSONL inputs, normalized into turn/window chunks with role metadata.
+* Structure-first chunking with max character cap and small line overlap.
+* SHA-256 content hash handling.
+* Canonical source identity behavior using explicit `canonical_key` or `source_type:absolute_path` fallback.
+* Duplicate content skip for the same canonical source and hash.
+* New source version creation for changed content under the same canonical source.
+* Raw Archive writes under `source_type/source_id/version_id`.
+* Chunk and citation creation for ingested evidence.
+* Ingest job summary updates for completed, skipped, failed, and completed_with_errors outcomes.
+* Non-recursive directory ingest with per-file failure continuation.
+* Synthetic/non-private fixtures for Markdown and AI conversation formats.
+* Backend code-spec updates for directory structure, database, error handling, logging, and quality rules.
+
+Verified:
+
+* `uv run pytest tests/test_ingest.py` passed: 6 tests.
+* `uv run pytest` passed: 13 tests.
+
+Notes:
+
+* PR3 does not implement search ranking, `read_source`, or Context Pack behavior; those remain PR4-PR6.
+* FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
+
 ## Final Acceptance Procedure
 
 MVP is accepted only when all of the following pass:

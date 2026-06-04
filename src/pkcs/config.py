@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs"
     raw_archive_path: Path = Path("data/raw")
     default_top_k: int = Field(default=10, ge=1)
+    ingest_chunk_max_chars: int = Field(default=2000, ge=200)
+    ingest_chunk_overlap_lines: int = Field(default=2, ge=0)
     context_pack_max_evidence: int = Field(default=10, ge=1)
     context_pack_max_evidence_per_source: int = Field(default=3, ge=1)
 
@@ -22,4 +24,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

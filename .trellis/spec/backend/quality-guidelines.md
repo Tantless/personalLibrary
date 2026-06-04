@@ -1,51 +1,74 @@
 # Quality Guidelines
 
-> Code quality standards for backend development.
+> Backend quality rules for PKCS MVP implementation.
 
 ---
 
-## Overview
+## Scenario: Local Knowledge Backend Changes
 
-<!--
-Document your project's quality standards here.
+### 1. Scope / Trigger
 
-Questions to answer:
-- What patterns are forbidden?
-- What linting rules do you enforce?
-- What are your testing requirements?
-- What code review standards apply?
--->
+- Trigger: Any backend code change in `src/pkcs/`, migrations, fixtures, or tests.
+- Core requirement: Keep PR-sized changes narrow and verifiable; do not add future MVP features early.
 
-(To be filled by the team)
+### 2. Signatures
 
----
+Required verification for backend PR-sized work:
 
-## Forbidden Patterns
+```bash
+docker compose ps postgres
+uv run alembic upgrade head
+uv run pytest
+git diff --check
+```
 
-<!-- Patterns that should never be used and why -->
+### 3. Contracts
 
-(To be filled by the team)
+- Use synthetic or non-private fixtures under `tests/fixtures/`.
+- Do not ingest real personal data during tests.
+- Keep interface layers thin; CLI/MCP/HTTP should call shared services.
+- Do not introduce LangChain, LlamaIndex, Haystack, pgvector, OpenSearch, or rerankers in MVP PRs unless the PRD changes.
+- Do not write `chunks.search_vector` from application code.
+- Keep local-only behavior: no URL crawling, raw content upload, remote exposure, auth, or UI in MVP PR3.
 
----
+### 4. Validation & Error Matrix
 
-## Required Patterns
+| Change | Required verification |
+|--------|-----------------------|
+| Parser behavior | Synthetic fixture tests |
+| Database writes | Docker-backed integration test |
+| CLI/MCP command | Interface smoke test |
+| Config key | `.env.example` update |
+| New code-spec convention | Update relevant `.trellis/spec/backend/*.md` |
 
-<!-- Patterns that must always be used -->
+### 5. Good/Base/Bad Cases
 
-(To be filled by the team)
+Good:
 
----
+```python
+body = json.loads(result.stdout)
+assert body["status"] == "completed"
+```
 
-## Testing Requirements
+Bad:
 
-<!-- What level of testing is expected -->
+```python
+# Do not assert only that the command exits; assert the stable report shape.
+assert result.exit_code == 0
+```
 
-(To be filled by the team)
+### 6. Tests Required
 
----
+- Full suite: `uv run pytest`.
+- For database PRs: PostgreSQL must be healthy and Alembic must be at head.
+- For PR3 ingest: tests must cover file ingest, directory ingest, duplicate skip, new version creation, parser metadata, CLI, and MCP.
 
-## Code Review Checklist
+### 7. Wrong vs Correct
 
-<!-- What reviewers should check -->
+#### Wrong
 
-(To be filled by the team)
+Adding search ranking or Context Pack behavior during the ingest PR.
+
+#### Correct
+
+Store searchable chunks and citations now; implement ranking and Context Pack in their own PRs.

@@ -1,0 +1,2 @@
+{"conversation_title":"Codex Session","role":"user","content":"Plan the ingest pipeline for Markdown notes."}
+{"conversation_title":"Codex Session","role":"assistant","content":"Use structure-first chunks and keep line locators."}

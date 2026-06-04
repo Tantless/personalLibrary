@@ -40,11 +40,14 @@ IngestJobRepository(session: Session)
 Required write methods:
 
 ```python
+SourceRepository.get_by_canonical_key(canonical_key)
+SourceRepository.get_version_by_hash(source_id, content_hash)
 SourceRepository.create_source(canonical_key, title, source_type, origin_uri=None)
-SourceRepository.create_version(source, content_hash, file_path, raw_archive_path, status="imported", metadata_json=None)
+SourceRepository.create_version(source, content_hash, file_path, raw_archive_path, version_id=None, status="imported", metadata_json=None)
 ChunkRepository.create_chunk(source_id, version_id, chunk_index, title, source_type, locator, line_start, line_end, content, ...)
 CitationRepository.create_citation(source_id, version_id, chunk_id, locator, line_start, line_end, quote=None, metadata_json=None)
 IngestJobRepository.create_job(source_type, input_path, status="started", summary_json=None)
+IngestJobRepository.finish_job(job, status, summary_json, error_message=None)
 ```
 
 ### 3. Contracts
@@ -78,6 +81,7 @@ Transaction boundary:
 - Repositories call `session.flush()` to materialize IDs and constraints.
 - Callers own `commit()` and `rollback()`.
 - Do not hide transaction commits inside repositories.
+- Ingest may pass a pre-generated `version_id` to `create_version()` so Raw Archive paths can include `source_id/version_id` before the database row is inserted.
 
 ### 4. Validation & Error Matrix
 
@@ -89,6 +93,8 @@ Transaction boundary:
 | Duplicate `(version_id, chunk_index)` | Database rejects duplicate chunk order | `uq_chunks_version_chunk_index` remains present |
 | Insert chunk without `search_vector` | Database generates `search_vector` | `test_chunks_search_vector_is_database_generated` |
 | Repository create methods called | IDs are available after method returns | Repository tests assert persisted rows |
+| Duplicate ingest for same canonical source and content hash | Application skips new version creation | Ingest tests assert the existing version id is returned |
+| Changed content for same canonical source | Application creates a new source version and preserves old version | Ingest tests assert two versions for one source |
 
 ### 5. Good/Base/Bad Cases
 
@@ -126,6 +132,7 @@ session.commit()
 - `tests/test_database_schema.py`: table presence, required indexes, generated `search_vector`.
 - `tests/test_repositories.py`: repository write/read behavior and caller-owned commit.
 - `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
+- `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, and ingest job summaries.
 - Full PR-sized database changes must run `uv run pytest` with Docker PostgreSQL healthy.
 
 ### 7. Wrong vs Correct
