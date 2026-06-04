@@ -20,6 +20,7 @@ IngestInputError(ValueError)
 IngestParseError(ValueError)
 SearchInputError(ValueError)
 ReadSourceError(ValueError)
+ContextPackInputError(ValueError)
 ```
 
 Report fields:
@@ -52,6 +53,12 @@ Read source behavior:
 - `read_source()` must accept either `chunk_id` or all of `source_id`, `version_id`, and `locator`.
 - Invalid locators must fail before any Raw Archive read.
 
+Context Pack behavior:
+
+- `ContextPackInputError` covers empty query, invalid `top_k`, and invalid `budget_tokens`.
+- Search no-results remains a valid Context Pack with empty `sources`, `evidence`, and `followup_read_suggestions`.
+- Context Pack errors from `SearchService` or `ReadSourceService` should propagate; do not silently drop unreadable evidence.
+
 ### 4. Validation & Error Matrix
 
 | Case | Expected behavior |
@@ -69,6 +76,9 @@ Read source behavior:
 | Missing source/version | `ReadSourceError` |
 | Invalid `line N-M` locator | `ReadSourceError` |
 | Negative `context_lines` | `ReadSourceError` |
+| Empty Context Pack query | `ContextPackInputError` |
+| Invalid Context Pack `budget_tokens` | `ContextPackInputError` |
+| Context Pack no results | Valid response with empty evidence and Caveats |
 
 ### 5. Good/Base/Bad Cases
 
@@ -95,6 +105,7 @@ for file_path in files:
 - `tests/test_ingest.py::test_ingest_directory_is_non_recursive_and_continues_after_file_failure`
 - `tests/test_search.py::test_search_no_results_returns_empty_list`
 - `tests/test_reader.py::test_read_source_invalid_locator_and_missing_chunk_errors`
+- `tests/test_context_pack.py::test_context_pack_no_results_returns_empty_evidence_with_caveats`
 - Add a test whenever a new error status or input validation branch is introduced.
 
 ### 7. Wrong vs Correct

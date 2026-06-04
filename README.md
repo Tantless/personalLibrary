@@ -23,6 +23,7 @@ Completed PR-sized steps:
 * PR3: local file ingest for Markdown/text documents and AI conversations, duplicate hash skip, new-version behavior, CLI ingest, MCP `ingest_source`.
 * PR4: PostgreSQL FTS search provider, CLI search, MCP `search_knowledge`, filters, title boost, and stable evidence result shape.
 * PR5: Raw Archive backed `read_source`, CLI read, MCP `read_source`, `chunk_id` and source/version/locator addressing.
+* PR6: Context Pack v0 JSON + Markdown, evidence caps, per-source limits, soft `budget_tokens`, Caveats, CLI context-pack, MCP `get_context_pack`.
 
 ## Local Setup
 
@@ -145,3 +146,35 @@ uv run pkcs read --chunk-id <chunk_id> --context-lines 2
 The read response contains source refs, locator, citation line range, returned context line range, fragment `content`, and metadata. PR5 defaults to returning the citation lines only; it does not return the whole source by default.
 
 MCP exposes the same behavior as `read_source`.
+
+## Context Pack
+
+PR6 builds Context Pack v0 by calling search, selecting evidence with deduplication and per-source caps, reading source fragments back through `read_source`, and rendering both structured JSON and Markdown.
+
+CLI examples:
+
+```powershell
+uv run pkcs context-pack "source evidence" --top-k 10
+uv run pkcs context-pack "stable citations" --source-type markdown_doc --budget-tokens 800
+uv run pkcs context-pack "acceptance" --canonical-key markdown_doc:product-notes
+```
+
+The response contains:
+
+* `query`
+* `retrieval_plan`
+* `sources`
+* `evidence`
+* `followup_read_suggestions`
+* `context_pack_markdown`
+
+Defaults:
+
+* maximum evidence: `PKCS_CONTEXT_PACK_MAX_EVIDENCE=10`
+* maximum evidence per source: `PKCS_CONTEXT_PACK_MAX_EVIDENCE_PER_SOURCE=3`
+
+`budget_tokens` is a soft Markdown length hint, not an exact token guarantee. Structured evidence remains available even when Markdown is shortened.
+
+`context_pack_markdown` always includes `Conflicts / Caveats` and explicitly states that MVP does not perform real conflict detection.
+
+MCP exposes the same behavior as `get_context_pack`.

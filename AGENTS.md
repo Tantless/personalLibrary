@@ -34,8 +34,8 @@ This temporary block preserves only the confirmed MVP planning state. The detail
 
 * MVP PRD confirmed by user on 2026-06-04.
 * No open MVP decisions remain.
-* PR1, PR2, PR3, PR4, and PR5 have been implemented, verified, and committed.
-* Next engineering step: PR6 Context Pack v0 JSON + Markdown.
+* PR1, PR2, PR3, PR4, PR5, and PR6 have been implemented, verified, and committed.
+* Next engineering step: PR7 synthetic fixture corpus, eval queries, retrieval thresholds, docs, and MCP smoke acceptance.
 * M3-M5 planning remains future work.
 
 ## Workflow Rule
@@ -70,6 +70,7 @@ Core constraints:
 * Evidence must always map to `source_id`, `version_id`, and locator; `read_source` supports `chunk_id` and full source/version/locator addressing
 * Search: `SearchProvider` abstraction, PostgreSQL FTS provider, `search_knowledge`, title boost, `source_type`/`canonical_key`/`top_k` filters, stable evidence result shape
 * Read source: `ReadSourceService`, Raw Archive backed reads, `line N-M` locators, `chunk_id` and source/version/locator addressing, optional `context_lines`
+* Context Pack: `ContextPackService`, search + read_source orchestration, chunk deduplication, evidence caps, per-source cap, JSON + Markdown response, soft `budget_tokens`, Caveats
 
 Out of MVP scope:
 
@@ -89,7 +90,7 @@ Out of MVP scope:
 * PR3: AI conversation and Markdown/text ingest, structure-first chunking, duplicate/new-version behavior, ingest report - completed
 * PR4: PostgreSQL FTS SearchProvider, title boost, filters, search result shape - completed
 * PR5: `read_source` by `chunk_id` and source/version/locator, with optional `context_lines` - completed
-* PR6: Context Pack v0 JSON + Markdown, evidence caps, Caveats, soft `budget_tokens`
+* PR6: Context Pack v0 JSON + Markdown, evidence caps, Caveats, soft `budget_tokens` - completed
 * PR7: synthetic fixtures, `eval_queries.jsonl`, retrieval thresholds, docs, Codex-first MCP smoke test with generic MCP fallback
 
 ## Acceptance Summary

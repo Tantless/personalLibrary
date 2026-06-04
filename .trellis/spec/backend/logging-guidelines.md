@@ -29,6 +29,7 @@ ingest_file_skipped
 ingest_file_failed
 search_knowledge_completed
 read_source_completed
+context_pack_completed
 ```
 
 ### 3. Contracts
@@ -38,6 +39,7 @@ read_source_completed
 - For failures, include path and source_type, but not content.
 - For search, include `source_type`, `top_k`, and `result_count`; do not log the full query text.
 - For `read_source`, include source/version/chunk refs and `context_lines`; do not log returned content.
+- For Context Pack, include `source_type`, `top_k`, and `evidence_count`; do not log the query, evidence content, or Markdown body.
 - `ingest_jobs.summary_json` is the durable MVP audit surface; logs are operational traces.
 
 ### 4. Validation & Error Matrix
@@ -49,6 +51,7 @@ read_source_completed
 | Local path | Yes for local MVP, but no content | Needed to debug ingest |
 | Search query text | No by default | May contain private intent or pasted content |
 | `read_source` returned content | No | Direct source material |
+| Context Pack Markdown | No | Aggregated private source material |
 | Chunk content or quote | No | Private source material |
 | Secret/env values | No | Credential leak risk |
 
@@ -70,6 +73,11 @@ logger.info(
 logger.info(
     "read_source_completed",
     extra={"event": "read_source_completed", "source_id": source_id, "version_id": version_id, "context_lines": context_lines},
+)
+
+logger.info(
+    "context_pack_completed",
+    extra={"event": "context_pack_completed", "source_type": source_type, "top_k": top_k, "evidence_count": evidence_count},
 )
 ```
 

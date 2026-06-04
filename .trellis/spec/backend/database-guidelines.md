@@ -70,6 +70,12 @@ format_line_locator(line_start, line_end) -> str
 ReadSourceService.read_source(chunk_id=None, source_id=None, version_id=None, locator=None, context_lines=0)
 ```
 
+Context Pack signatures:
+
+```python
+ContextPackService.get_context_pack(query, source_type=None, canonical_key=None, top_k=None, budget_tokens=None)
+```
+
 ### 3. Contracts
 
 Core tables:
@@ -87,6 +93,14 @@ Read source:
 - `read_source(source_id=..., version_id=..., locator=...)` parses the locator and reads the matching line range even if no exact chunk row exists.
 - Source text must be read from `source_versions.raw_archive_path`, not from the current original file path.
 - `context_lines` may expand the returned line range but must not make whole-source reads the default.
+
+Context Pack:
+
+- Context Pack must call `SearchService` for candidate evidence and `ReadSourceService` for source fragments.
+- Every Context Pack evidence item must carry `chunk_id`, `source_id`, `version_id`, `canonical_key`, `locator`, `line_start`, and `line_end`.
+- Evidence selection is search top_k plus chunk deduplication and per-source evidence cap.
+- `budget_tokens` only affects `context_pack_markdown`; it is a soft hint and not an exact tokenizer guarantee.
+- `context_pack_markdown` must include `Conflicts / Caveats` and state that real conflict detection is not performed in MVP.
 
 Full-text search:
 
@@ -131,6 +145,9 @@ Transaction boundary:
 | Read by `chunk_id` | Returns source/version refs and fragment content for that chunk locator | Reader tests map search result chunk id back to source |
 | Read by source/version/locator | Returns the requested line range plus optional context | Reader tests use `line 4-4` with `context_lines=1` |
 | Invalid locator | Raises reader input error | Reader tests assert invalid locator failure |
+| Context Pack evidence selected | Each item maps back to `read_source(chunk_id=...)` | Context Pack tests compare evidence content with read_source |
+| Multiple adjacent chunks from one source | Per-source cap limits source dominance | Context Pack tests assert per-source cap |
+| Soft budget set | Markdown gets shorter but structured evidence remains traceable | Context Pack budget test |
 
 ### 5. Good/Base/Bad Cases
 
@@ -171,6 +188,7 @@ session.commit()
 - `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, and ingest job summaries.
 - `tests/test_search.py`: PostgreSQL FTS query, title boost, filters, top_k, no-results, and interface smoke tests.
 - `tests/test_reader.py`: `chunk_id`, source/version/locator, `context_lines`, invalid locator, CLI, and MCP.
+- `tests/test_context_pack.py`: evidence caps, per-source limit, budget, caveats, read_source mapping, CLI, and MCP.
 - Full PR-sized database changes must run `uv run pytest` with Docker PostgreSQL healthy.
 
 ### 7. Wrong vs Correct
@@ -213,6 +231,14 @@ lines = path.read_text(encoding="utf-8-sig").splitlines()
 
 Do not read from `source_versions.file_path` for evidence recovery because the original file may have moved or changed after ingest.
 
+Context Pack must preserve traceability:
+
+```python
+fragment = read_source_service.read_source(chunk_id=result.chunk_id)
+```
+
+Do not put evidence content into a Context Pack without refs that can be read back.
+
 ---
 
 ## Common Mistakes
@@ -222,3 +248,4 @@ Do not read from `source_versions.file_path` for evidence recovery because the o
 - Committing inside repository methods, which makes multi-table ingest rollback unsafe.
 - Writing optional PostgreSQL filter clauses as `:source_type is null`; cast nullable params with `cast(:source_type as text)` so PostgreSQL can infer the type.
 - Reading current source files instead of Raw Archive in `read_source`; this breaks version traceability.
+- Building Context Pack evidence directly from snippets only; snippets are not enough for read-back traceability.

@@ -4,6 +4,7 @@ from pathlib import Path
 import typer
 
 from pkcs.config import get_settings
+from pkcs.context_pack import ContextPackService
 from pkcs.health import get_health_status
 from pkcs.ingest import IngestService
 from pkcs.reader import ReadSourceService
@@ -71,9 +72,22 @@ def read_source(
 
 
 @app.command("context-pack")
-def context_pack() -> None:
-    """Placeholder for MVP context-pack command."""
-    raise typer.BadParameter("context-pack is not implemented in PR1")
+def context_pack(
+    query: str = typer.Argument(..., help="Query to build a Context Pack for."),
+    source_type: str | None = typer.Option(None, "--source-type", help="Optional source type filter."),
+    canonical_key: str | None = typer.Option(None, "--canonical-key", help="Optional canonical source key filter."),
+    top_k: int | None = typer.Option(None, "--top-k", min=1, help="Search candidate count."),
+    budget_tokens: int | None = typer.Option(None, "--budget-tokens", min=1, help="Soft Markdown budget hint."),
+) -> None:
+    """Build Context Pack v0 as JSON plus Markdown."""
+    response = ContextPackService.from_settings(get_settings()).get_context_pack(
+        query=query,
+        source_type=source_type,
+        canonical_key=canonical_key,
+        top_k=top_k,
+        budget_tokens=budget_tokens,
+    )
+    typer.echo(json.dumps(response.to_dict(), ensure_ascii=False))
 
 
 if __name__ == "__main__":

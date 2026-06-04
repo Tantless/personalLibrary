@@ -1,6 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 
 from pkcs.config import get_settings
+from pkcs.context_pack import ContextPackService
 from pkcs.health import get_health_status
 from pkcs.ingest import IngestService
 from pkcs.reader import ReadSourceService
@@ -59,6 +60,24 @@ def create_mcp_server() -> FastMCP:
             context_lines=context_lines,
         )
         return fragment.to_dict()
+
+    @server.tool()
+    def get_context_pack(
+        query: str,
+        source_type: str | None = None,
+        canonical_key: str | None = None,
+        top_k: int | None = None,
+        budget_tokens: int | None = None,
+    ) -> dict:
+        """Build Context Pack v0 as JSON plus Markdown."""
+        response = ContextPackService.from_settings(settings).get_context_pack(
+            query=query,
+            source_type=source_type,
+            canonical_key=canonical_key,
+            top_k=top_k,
+            budget_tokens=budget_tokens,
+        )
+        return response.to_dict()
 
     return server
 

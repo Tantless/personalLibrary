@@ -19,6 +19,9 @@ Current layout:
 src/pkcs/
 ├── cli.py                  # Typer command wiring only
 ├── config.py               # Pydantic Settings
+├── context_pack/
+│   ├── models.py           # Context Pack response/evidence/source contracts
+│   └── service.py          # Search + read_source orchestration and Markdown rendering
 ├── health.py               # Health application function
 ├── db/
 │   ├── models.py           # SQLAlchemy ORM models
@@ -48,6 +51,7 @@ src/pkcs/
 - Parsers return plain data models and must not write to the database or filesystem.
 - Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
 - Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.
+- Context Pack services own retrieval orchestration and Markdown rendering; they call `SearchService` and `ReadSourceService` instead of querying the database directly.
 - Repositories write ORM objects and call `flush()`, but callers own commits.
 - Storage helpers write bytes and return paths; they must not know database schema beyond path arguments passed in.
 
@@ -61,6 +65,7 @@ src/pkcs/
 | New cross-layer report field | Assert the field in service and interface tests |
 | New search result field | Assert the field in service and interface tests |
 | New reader result field | Assert the field in service and interface tests |
+| New Context Pack field | Assert the field in service and interface tests |
 
 ### 5. Good/Base/Bad Cases
 
@@ -87,6 +92,14 @@ fragment = ReadSourceService.from_settings(settings).read_source(
     locator=locator,
     context_lines=context_lines,
 )
+
+pack = ContextPackService.from_settings(settings).get_context_pack(
+    query=query,
+    source_type=source_type,
+    canonical_key=canonical_key,
+    top_k=top_k,
+    budget_tokens=budget_tokens,
+)
 ```
 
 Bad:
@@ -103,6 +116,7 @@ def ingest(...):
 - Shared service behavior: `tests/test_ingest.py`.
 - Search behavior: `tests/test_search.py`.
 - Reader behavior: `tests/test_reader.py`.
+- Context Pack behavior: `tests/test_context_pack.py`.
 - Interface smoke tests: CLI and MCP tests for commands/tools that call the service.
 - Data-layer changes: `tests/test_database_schema.py` and `tests/test_repositories.py`.
 
@@ -114,4 +128,4 @@ Duplicating ingest logic in `cli.py` and `mcp/server.py`.
 
 #### Correct
 
-Keep interface layers thin and call `IngestService`, `SearchService`, or `ReadSourceService`.
+Keep interface layers thin and call `IngestService`, `SearchService`, `ReadSourceService`, or `ContextPackService`.

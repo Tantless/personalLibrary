@@ -315,6 +315,36 @@ Notes:
 * PR5 does not implement Context Pack behavior; that remains PR6.
 * FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
 
+### PR6: Context Pack v0
+
+Status: completed locally on 2026-06-04.
+
+Delivered:
+
+* `ContextPackService.get_context_pack()` application workflow.
+* Context Pack v0 outer JSON with `query`, `retrieval_plan`, `sources`, `evidence`, `followup_read_suggestions`, and `context_pack_markdown`.
+* Evidence selection using search top_k, chunk deduplication, global evidence cap, and per-source evidence cap.
+* Evidence content read through `ReadSourceService` so every evidence item maps back to `read_source`.
+* Structured evidence refs with chunk/source/version/canonical key/locator/line range.
+* Follow-up read suggestions with `chunk_id` and `context_lines`.
+* Markdown rendering with retrieval plan, sources, evidence, follow-up reads, and `Conflicts / Caveats`.
+* Caveats explicitly state that MVP does not perform real conflict detection.
+* `budget_tokens` soft Markdown length hint; no exact tokenizer guarantee.
+* Functional `pkcs context-pack` CLI command.
+* FastMCP `get_context_pack` tool.
+* Docker-backed Context Pack tests for JSON shape, evidence caps, per-source limit, budget behavior, caveats, read_source mapping, CLI, and MCP.
+* Backend code-spec updates for Context Pack module layout, evidence traceability, errors, logging, and quality requirements.
+
+Verified:
+
+* `uv run pytest tests/test_context_pack.py` passed: 5 tests.
+* `uv run pytest` passed: 28 tests.
+
+Notes:
+
+* PR6 does not implement PR7 eval corpus, retrieval thresholds, or external MCP client acceptance.
+* FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
+
 ## Final Acceptance Procedure
 
 MVP is accepted only when all of the following pass:
