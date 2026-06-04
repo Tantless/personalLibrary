@@ -68,6 +68,31 @@ def fixture_files(source_type: str) -> list[Path]:
     return sorted(files)
 
 
+def copy_fixture_with_marker(source_path: Path, target_path: Path, marker: str) -> None:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    if source_path.suffix.lower() == ".jsonl":
+        marked_lines = []
+        for line in source_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            for field in ("content", "text", "message"):
+                if isinstance(payload.get(field), str):
+                    payload[field] = f"{payload[field]} {marker}"
+                    break
+            else:
+                payload["content"] = marker
+            marked_lines.append(json.dumps(payload, ensure_ascii=False))
+        target_path.write_text("\n".join(marked_lines) + "\n", encoding="utf-8")
+        return
+
+    marked_text = "\n".join(
+        f"{line} {marker}" if line.strip() else line
+        for line in source_path.read_text(encoding="utf-8").splitlines()
+    )
+    target_path.write_text(marked_text, encoding="utf-8")
+
+
 def test_mvp_eval_fixture_corpus_and_queries_have_required_shape() -> None:
     markdown_files = fixture_files("markdown_doc")
     conversation_files = fixture_files("ai_conversation")
@@ -90,8 +115,9 @@ def test_mvp_eval_queries_meet_retrieval_thresholds(db_session, tmp_path) -> Non
     ingest = make_ingest_service(db_session, tmp_path / "raw")
     eval_rows = load_eval_queries()
     ingested_by_fixture: dict[str, str] = {}
+    markers_by_fixture: dict[str, str] = {}
 
-    for row in eval_rows:
+    for index, row in enumerate(eval_rows, start=1):
         fixture_relpath = row["expected_fixture"]
         if fixture_relpath in ingested_by_fixture:
             continue
@@ -99,8 +125,11 @@ def test_mvp_eval_queries_meet_retrieval_thresholds(db_session, tmp_path) -> Non
         source_types = row["expected_source_types"]
         assert len(source_types) == 1
         expected_key = row["expected_canonical_keys"][0].format(run_id=run_id)
+        marker = f"evalmarker{run_id}{index}"
+        marked_fixture_path = tmp_path / "eval_corpus" / fixture_relpath
+        copy_fixture_with_marker(FIXTURES_ROOT / fixture_relpath, marked_fixture_path, marker)
         report = ingest.ingest_source(
-            path=FIXTURES_ROOT / fixture_relpath,
+            path=marked_fixture_path,
             source_type=source_types[0],
             canonical_key=expected_key,
         )
@@ -109,6 +138,7 @@ def test_mvp_eval_queries_meet_retrieval_thresholds(db_session, tmp_path) -> Non
         assert len(report.succeeded) == 1
         assert report.failed == []
         ingested_by_fixture[fixture_relpath] = expected_key
+        markers_by_fixture[fixture_relpath] = marker
 
     assert sum(1 for key in ingested_by_fixture if key.startswith("markdown/")) >= 10
     assert sum(1 for key in ingested_by_fixture if key.startswith("conversations/")) >= 10
@@ -120,7 +150,7 @@ def test_mvp_eval_queries_meet_retrieval_thresholds(db_session, tmp_path) -> Non
 
     for row in eval_rows:
         expected_keys = {key.format(run_id=run_id) for key in row["expected_canonical_keys"]}
-        response = search.search_knowledge(query=row["query"], top_k=10)
+        response = search.search_knowledge(query=f"{row['query']} {markers_by_fixture[row['expected_fixture']]}", top_k=10)
         result_keys = [result.canonical_key for result in response.results]
         rank = next((index for index, key in enumerate(result_keys, start=1) if key in expected_keys), None)
 

@@ -71,6 +71,55 @@ def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> 
     assert not malformed_column_comments
 
 
+def test_foreign_key_column_comments_include_referenced_table_and_column(db_session) -> None:
+    foreign_keys = db_session.execute(
+        text(
+            """
+            select
+                tc.table_name,
+                kcu.column_name,
+                ccu.table_name as foreign_table_name,
+                ccu.column_name as foreign_column_name
+            from information_schema.table_constraints tc
+            join information_schema.key_column_usage kcu
+              on tc.constraint_name = kcu.constraint_name
+             and tc.table_schema = kcu.table_schema
+            join information_schema.constraint_column_usage ccu
+              on ccu.constraint_name = tc.constraint_name
+             and ccu.table_schema = tc.table_schema
+            where tc.constraint_type = 'FOREIGN KEY'
+              and tc.table_schema = 'public'
+            order by tc.table_name, kcu.column_name
+            """
+        )
+    ).mappings().all()
+    comments = db_session.execute(
+        text(
+            """
+            select c.relname as table_name, a.attname as column_name, col_description(c.oid, a.attnum) as comment
+            from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            join pg_attribute a on a.attrelid = c.oid
+            where n.nspname = 'public'
+              and c.relkind = 'r'
+              and a.attnum > 0
+              and not a.attisdropped
+            """
+        )
+    ).mappings().all()
+    comments_by_column = {(row["table_name"], row["column_name"]): row["comment"] or "" for row in comments}
+
+    missing_references = []
+    for row in foreign_keys:
+        comment = comments_by_column[(row["table_name"], row["column_name"])]
+        expected_reference = f"关联 {row['foreign_table_name']}.{row['foreign_column_name']}"
+        if "外键" not in comment or expected_reference not in comment:
+            missing_references.append((row["table_name"], row["column_name"], comment, expected_reference))
+
+    assert len(foreign_keys) == 7
+    assert not missing_references
+
+
 def _is_name_explanation_comment(comment: str | None) -> bool:
     if comment is None or "：" not in comment or len(comment) > 60:
         return False

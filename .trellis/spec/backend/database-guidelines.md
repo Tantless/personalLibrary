@@ -91,6 +91,7 @@ Schema comments:
 - Every persisted PostgreSQL table and column must have a database-level comment, visible through DBeaver and `pg_catalog`.
 - PKCS schema comments are written in Chinese because the primary local database inspection workflow is Chinese-language review.
 - Use the concise format `<中文名>：<一句话解释>` for both table and column comments.
+- If a column has a real PostgreSQL foreign key constraint, its comment must include `外键，关联 <table>.<column>`.
 - Keep comments short enough for database UI inspection; avoid paragraph-length explanations in column comments.
 - Add comments through Alembic migrations with `COMMENT ON TABLE ... IS ...` and `COMMENT ON COLUMN ... IS ...`.
 - When adding a table or column, update the schema comment migration path and `tests/test_database_schema.py` so missing comments fail tests.
@@ -158,6 +159,7 @@ Transaction boundary:
 | Multiple adjacent chunks from one source | Per-source cap limits source dominance | Context Pack tests assert per-source cap |
 | Soft budget set | Markdown gets shorter but structured evidence remains traceable | Context Pack budget test |
 | Table or column exists in public schema | PostgreSQL comment is present, non-empty, and formatted as `<中文名>：<一句话解释>` | Schema test queries `obj_description` and `col_description` |
+| Column has a foreign key constraint | Column comment includes `外键` and the exact referenced `<table>.<column>` | Schema test queries `information_schema` foreign keys and `col_description` |
 
 ### 5. Good/Base/Bad Cases
 
@@ -194,6 +196,7 @@ session.commit()
 
 - `tests/test_database_schema.py`: table presence, required indexes, generated `search_vector`.
 - `tests/test_database_schema.py`: table and column comments must be present for all PKCS public schema tables and use concise Chinese name-plus-explanation format.
+- `tests/test_database_schema.py`: foreign key column comments must include the referenced table and column.
 - `tests/test_repositories.py`: repository write/read behavior and caller-owned commit.
 - `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
 - `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, and ingest job summaries.
@@ -258,6 +261,7 @@ Do not put evidence content into a Context Pack without refs that can be read ba
 - Adding a model field without adding an Alembic migration and a schema assertion.
 - Adding a table or column without a Chinese PostgreSQL comment; this makes DBeaver inspection ambiguous.
 - Writing paragraph-length schema comments; DBeaver comments should stay scannable as `<中文名>：<解释>`.
+- Writing a foreign key comment without the referenced table and column; DBeaver users need the relationship without opening constraints.
 - Committing inside repository methods, which makes multi-table ingest rollback unsafe.
 - Writing optional PostgreSQL filter clauses as `:source_type is null`; cast nullable params with `cast(:source_type as text)` so PostgreSQL can infer the type.
 - Reading current source files instead of Raw Archive in `read_source`; this breaks version traceability.
