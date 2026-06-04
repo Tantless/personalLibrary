@@ -1,0 +1,2 @@
+{"conversation_title":"Ingest Debug","role":"user","content":"A directory import has one bad file and one supported file."}
+{"conversation_title":"Ingest Debug","role":"assistant","content":"The erroranchor answer is to continue after each file failure and report succeeded, skipped, and failed items."}

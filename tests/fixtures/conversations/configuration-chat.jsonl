@@ -1,0 +1,2 @@
+{"conversation_title":"Configuration Chat","role":"user","content":"Where do local settings come from?"}
+{"conversation_title":"Configuration Chat","role":"assistant","content":"The settingsanchor note uses Pydantic Settings for database URL, raw archive path, and default top_k."}

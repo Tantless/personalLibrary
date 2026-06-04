@@ -24,6 +24,7 @@ Completed PR-sized steps:
 * PR4: PostgreSQL FTS search provider, CLI search, MCP `search_knowledge`, filters, title boost, and stable evidence result shape.
 * PR5: Raw Archive backed `read_source`, CLI read, MCP `read_source`, `chunk_id` and source/version/locator addressing.
 * PR6: Context Pack v0 JSON + Markdown, evidence caps, per-source limits, soft `budget_tokens`, Caveats, CLI context-pack, MCP `get_context_pack`.
+* PR7: synthetic MVP fixture corpus, `eval_queries.jsonl`, retrieval thresholds, final CLI flow, and MCP generic client fallback smoke test.
 
 ## Local Setup
 
@@ -178,3 +179,43 @@ Defaults:
 `context_pack_markdown` always includes `Conflicts / Caveats` and explicitly states that MVP does not perform real conflict detection.
 
 MCP exposes the same behavior as `get_context_pack`.
+
+## Evaluation
+
+PR7 adds a fixed synthetic/non-private evaluation corpus under `tests/fixtures/`:
+
+* `tests/fixtures/markdown/`: at least 10 Markdown/text document samples.
+* `tests/fixtures/conversations/`: at least 10 AI conversation samples in Markdown/transcript and JSONL formats.
+* `tests/fixtures/eval_queries.jsonl`: at least 20 query expectations.
+
+Each eval query line includes:
+
+* `query`
+* `expected_fixture`
+* `expected_canonical_keys`
+* `expected_source_types`
+* `notes`
+
+The acceptance test ingests the fixture corpus with runtime-unique canonical keys, runs PostgreSQL FTS across the corpus, and requires:
+
+* top 10 hit rate >= 80%
+* top 5 hit rate >= 60%
+
+Run the PR7 acceptance tests:
+
+```powershell
+uv run pytest tests/test_acceptance.py
+```
+
+## Final Acceptance
+
+With Docker PostgreSQL running, the local MVP acceptance gate is:
+
+```powershell
+docker compose ps postgres
+uv run alembic upgrade head
+uv run pytest
+git diff --check
+```
+
+`tests/test_acceptance.py` covers the final CLI ingest/search/read/context-pack flow and the Codex-first MCP acceptance fallback. If Codex MCP client configuration is unavailable in the environment, the test uses `FastMCP.call_tool` as a generic MCP client fallback and proves the same `health_check -> ingest_source -> search_knowledge -> read_source -> get_context_pack` tool flow.

@@ -6,7 +6,7 @@
 
 ## PRD Status
 
-Confirmed by user on 2026-06-04. This PRD is ready to move into Trellis Phase 2 preparation: codebase research, context initialization, task activation, then implementation.
+Confirmed by user on 2026-06-04. Implementation has progressed through PR1-PR7 locally; final acceptance is defined in the procedure below.
 
 ## MVP Success Statement
 
@@ -345,6 +345,36 @@ Notes:
 * PR6 does not implement PR7 eval corpus, retrieval thresholds, or external MCP client acceptance.
 * FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
 
+### PR7: Evaluation Corpus and Final Acceptance Smoke
+
+Status: completed locally on 2026-06-04.
+
+Delivered:
+
+* Synthetic/non-private fixture corpus under `tests/fixtures/`.
+* At least 10 Markdown/text document samples in `tests/fixtures/markdown/`.
+* At least 10 AI conversation samples in `tests/fixtures/conversations/`, covering Markdown/transcript and JSONL.
+* `tests/fixtures/eval_queries.jsonl` with 20 query expectation lines.
+* Eval query fields: `query`, `expected_fixture`, `expected_canonical_keys`, `expected_source_types`, and `notes`.
+* Docker-backed retrieval threshold test requiring top 10 >= 80% and top 5 >= 60%.
+* Final CLI smoke test covering ingest, search, read, and context-pack.
+* Codex-first MCP acceptance fallback test using `FastMCP.call_tool` to cover `health_check`, `ingest_source`, `search_knowledge`, `read_source`, and `get_context_pack`.
+* README documentation for evaluation and final acceptance commands.
+* Backend quality spec update for PR7 evaluation contracts.
+
+Verified:
+
+* `uv run pytest tests/test_acceptance.py` passed: 4 tests.
+* `docker compose ps postgres` reported PostgreSQL healthy.
+* `uv run alembic upgrade head` succeeded.
+* `uv run pytest` passed: 32 tests.
+* `git diff --check` reported no whitespace errors; only Windows LF/CRLF conversion warnings.
+
+Notes:
+
+* The MCP smoke test is the generic client fallback path. A real Codex MCP client smoke can be run later if local Codex MCP configuration is available.
+* Eval tests use runtime-unique canonical key templates so persistent Docker test data does not affect acceptance results.
+
 ## Final Acceptance Procedure
 
 MVP is accepted only when all of the following pass:
@@ -359,6 +389,15 @@ MVP is accepted only when all of the following pass:
 * HTTP health and MCP health pass.
 * Codex can call MCP tools for one real smoke task, or a generic MCP client fallback proves the same tool flow.
 * Documentation explains setup, config, ingest, search, read_source, context_pack, testing, and MVP limitations.
+
+Concrete commands:
+
+```powershell
+docker compose ps postgres
+uv run alembic upgrade head
+uv run pytest
+git diff --check
+```
 
 ## Out of Scope
 

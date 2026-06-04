@@ -34,8 +34,9 @@ This temporary block preserves only the confirmed MVP planning state. The detail
 
 * MVP PRD confirmed by user on 2026-06-04.
 * No open MVP decisions remain.
-* PR1, PR2, PR3, PR4, PR5, and PR6 have been implemented, verified, and committed.
-* Next engineering step: PR7 synthetic fixture corpus, eval queries, retrieval thresholds, docs, and MCP smoke acceptance.
+* PR1, PR2, PR3, PR4, PR5, PR6, and PR7 have been implemented and verified locally.
+* PR7 covers synthetic fixture corpus, eval queries, retrieval thresholds, docs, and MCP smoke acceptance.
+* After the PR7 commit, the M1+M2 MVP implementation PRD should be considered complete locally.
 * M3-M5 planning remains future work.
 
 ## Workflow Rule
@@ -91,7 +92,7 @@ Out of MVP scope:
 * PR4: PostgreSQL FTS SearchProvider, title boost, filters, search result shape - completed
 * PR5: `read_source` by `chunk_id` and source/version/locator, with optional `context_lines` - completed
 * PR6: Context Pack v0 JSON + Markdown, evidence caps, Caveats, soft `budget_tokens` - completed
-* PR7: synthetic fixtures, `eval_queries.jsonl`, retrieval thresholds, docs, Codex-first MCP smoke test with generic MCP fallback
+* PR7: synthetic fixtures, `eval_queries.jsonl`, retrieval thresholds, docs, Codex-first MCP smoke test with generic MCP fallback - completed
 
 ## Acceptance Summary
 
@@ -103,5 +104,12 @@ MVP is complete only when:
 * CLI, FastAPI health, MCP health, and Codex-first MCP smoke test pass.
 * Every search result and Context Pack evidence maps back to `read_source`.
 * Docs cover setup, config, ingest, search, `read_source`, Context Pack, testing, and limitations.
+
+## PR7 Acceptance Shape
+
+* Fixture corpus lives under `tests/fixtures/markdown/` and `tests/fixtures/conversations/`.
+* `tests/fixtures/eval_queries.jsonl` contains at least 20 query expectations with `query`, `expected_fixture`, `expected_canonical_keys`, `expected_source_types`, and `notes`.
+* PR7 tests use runtime-unique canonical keys to avoid persistent Docker database collisions.
+* Generic MCP fallback proves `health_check -> ingest_source -> search_knowledge -> read_source -> get_context_pack`.
 
 <!-- PKCS-PLANNING:TEMP-END -->

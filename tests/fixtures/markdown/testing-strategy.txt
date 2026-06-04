@@ -1,0 +1,10 @@
+# Testing Strategy
+
+## Retrieval Thresholds
+
+The thresholdanchor fixture records top ten and top five retrieval acceptance thresholds.
+Evaluation queries should be synthetic, repeatable, and safe to commit.
+
+## Final Checks
+
+Run migrations, pytest, and diff checks before committing a completed PR.

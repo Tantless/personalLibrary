@@ -1,0 +1,2 @@
+{"conversation_title":"Reader Session","role":"user","content":"How can an agent inspect exact source evidence?"}
+{"conversation_title":"Reader Session","role":"assistant","content":"The readeranchor flow calls read_source by chunk id and can ask for context_lines."}

@@ -40,6 +40,7 @@ git diff --check
 | PostgreSQL FTS search | Docker-backed search integration test |
 | Raw Archive source reading | Docker-backed reader integration test |
 | Context Pack generation | Docker-backed Context Pack integration test |
+| Eval corpus or retrieval threshold | Docker-backed acceptance test using synthetic fixtures |
 | CLI/MCP command | Interface smoke test |
 | Config key | `.env.example` update |
 | New code-spec convention | Update relevant `.trellis/spec/backend/*.md` |
@@ -68,6 +69,7 @@ assert result.exit_code == 0
 - For PR4 search: tests must cover result shape, `source_type` filter, `canonical_key` filter, `top_k`, title boost, no-results behavior, CLI, and MCP.
 - For PR5 reader: tests must cover `chunk_id`, source/version/locator addressing, `context_lines`, invalid locator/missing refs, CLI, and MCP.
 - For PR6 Context Pack: tests must cover outer JSON shape, evidence caps, per-source limit, `budget_tokens`, Caveats, `read_source` mapping, CLI, and MCP.
+- For PR7 acceptance: tests must ingest at least 10 Markdown/text fixtures and 10 AI conversation fixtures, validate `tests/fixtures/eval_queries.jsonl`, require top 10 >= 80% and top 5 >= 60%, cover CLI ingest/search/read/context-pack, and cover MCP health/ingest/search/read/context-pack via Codex or generic MCP client fallback.
 
 ### 7. Wrong vs Correct
 
@@ -84,3 +86,5 @@ For PR4, do not add `read_source` or Context Pack behavior; only return refs tha
 For PR5, do not add Context Pack behavior; return source fragments that PR6 can consume.
 
 For PR6, do not add PR7 eval corpus or MCP client acceptance; keep it to Context Pack behavior.
+
+For PR7, keep changes to synthetic fixtures, acceptance tests, docs, and specs unless a defect in earlier MVP behavior is exposed.

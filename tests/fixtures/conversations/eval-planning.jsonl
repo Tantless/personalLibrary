@@ -1,0 +1,2 @@
+{"conversation_title":"Eval Planning","role":"user","content":"How many retrieval questions are needed for MVP acceptance?"}
+{"conversation_title":"Eval Planning","role":"assistant","content":"The evalanchor plan uses at least twenty queries with top ten and top five thresholds."}
