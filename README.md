@@ -21,6 +21,7 @@ Completed PR-sized steps:
 * PR1: scaffold, Docker Compose PostgreSQL, FastAPI health, FastMCP skeleton, Typer CLI skeleton.
 * PR2: Alembic schema, required indexes, database-generated PostgreSQL FTS vector, Raw Archive writer, repositories.
 * PR3: local file ingest for Markdown/text documents and AI conversations, duplicate hash skip, new-version behavior, CLI ingest, MCP `ingest_source`.
+* PR4: PostgreSQL FTS search provider, CLI search, MCP `search_knowledge`, filters, title boost, and stable evidence result shape.
 
 ## Local Setup
 
@@ -96,3 +97,24 @@ Directory behavior:
 * A failed file is reported in `failed` and does not stop other files.
 
 The ingest report includes `ingest_job_id`, source/version refs, `canonical_key`, `content_hash`, chunk count, and `succeeded`/`skipped`/`failed` item lists.
+
+## Search
+
+PR4 supports PostgreSQL full-text search over ingested chunks. It uses PostgreSQL `simple` FTS, the database-generated `chunks.search_vector`, and ranking based on FTS rank plus explicit title match boost.
+
+CLI examples:
+
+```powershell
+uv run pkcs search "source evidence" --top-k 5
+uv run pkcs search "stable citations" --source-type ai_conversation
+uv run pkcs search "acceptance" --canonical-key markdown_doc:product-notes
+```
+
+The search response contains:
+
+* `query`, `source_type`, `canonical_key`, `top_k`
+* `results[]` with `result_id`, `chunk_id`, `source_id`, `version_id`, `canonical_key`, `title`, `source_type`, `snippet`, `score`, `citation`, and `metadata`
+
+MCP exposes the same behavior as `search_knowledge`.
+
+No-result searches return an empty `results` list. PR4 does not implement `read_source` or Context Pack generation.

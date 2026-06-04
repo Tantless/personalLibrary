@@ -6,6 +6,7 @@ import typer
 from pkcs.config import get_settings
 from pkcs.health import get_health_status
 from pkcs.ingest import IngestService
+from pkcs.search import SearchService
 
 app = typer.Typer(help="Personal Knowledge Context Server CLI")
 
@@ -33,9 +34,20 @@ def ingest(
 
 
 @app.command()
-def search() -> None:
-    """Placeholder for MVP search command."""
-    raise typer.BadParameter("search is not implemented in PR1")
+def search(
+    query: str = typer.Argument(..., help="Full-text search query."),
+    source_type: str | None = typer.Option(None, "--source-type", help="Optional source type filter."),
+    canonical_key: str | None = typer.Option(None, "--canonical-key", help="Optional canonical source key filter."),
+    top_k: int | None = typer.Option(None, "--top-k", min=1, help="Maximum number of results."),
+) -> None:
+    """Search ingested knowledge with PostgreSQL full-text search."""
+    response = SearchService.from_settings(get_settings()).search_knowledge(
+        query=query,
+        source_type=source_type,
+        canonical_key=canonical_key,
+        top_k=top_k,
+    )
+    typer.echo(json.dumps(response.to_dict(), ensure_ascii=False))
 
 
 @app.command("read")

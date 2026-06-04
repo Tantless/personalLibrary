@@ -18,6 +18,7 @@ Error classes:
 ```python
 IngestInputError(ValueError)
 IngestParseError(ValueError)
+SearchInputError(ValueError)
 ```
 
 Report fields:
@@ -38,6 +39,12 @@ IngestItemReport.error              # short reason, no source content
 - Directory ingest catches per-file exceptions, rolls back that file, records a failed item, and continues.
 - Interface layers should return the report shape rather than hiding item failures.
 
+Search behavior:
+
+- `SearchInputError` covers empty query, unsupported `source_type`, and invalid `top_k`.
+- Search with no matches returns a valid response with `results: []`; it is not an error.
+- Interface layers should return the stable search response shape for zero and nonzero results.
+
 ### 4. Validation & Error Matrix
 
 | Case | Expected behavior |
@@ -48,6 +55,9 @@ IngestItemReport.error              # short reason, no source content
 | Unsupported file inside directory | Report status `skipped` or `completed_with_errors`, skipped item |
 | Invalid UTF-8 file inside directory | Failed item, remaining files still ingest |
 | Duplicate content hash | Report status `skipped`, no new chunks |
+| Empty search query | `SearchInputError` |
+| Unsupported search `source_type` | `SearchInputError` |
+| Search no results | Valid response with empty `results` |
 
 ### 5. Good/Base/Bad Cases
 
@@ -72,6 +82,7 @@ for file_path in files:
 ### 6. Tests Required
 
 - `tests/test_ingest.py::test_ingest_directory_is_non_recursive_and_continues_after_file_failure`
+- `tests/test_search.py::test_search_no_results_returns_empty_list`
 - Add a test whenever a new error status or input validation branch is introduced.
 
 ### 7. Wrong vs Correct

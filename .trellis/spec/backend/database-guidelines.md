@@ -50,6 +50,14 @@ IngestJobRepository.create_job(source_type, input_path, status="started", summar
 IngestJobRepository.finish_job(job, status, summary_json, error_message=None)
 ```
 
+Search signatures:
+
+```python
+SearchProvider.search(query, top_k, source_type=None, canonical_key=None)
+PostgresFTSSearchProvider.from_database_url(database_url)
+SearchService.search_knowledge(query, source_type=None, canonical_key=None, top_k=None)
+```
+
 ### 3. Contracts
 
 Core tables:
@@ -64,6 +72,9 @@ Full-text search:
 
 - `chunks.search_vector` is a PostgreSQL generated column.
 - Application code must not write `search_vector`.
+- PostgreSQL FTS search must read `chunks.search_vector` and use `websearch_to_tsquery('simple', query)`.
+- Search ranking is `ts_rank_cd(chunks.search_vector, query)` plus an explicit title match boost.
+- Optional `source_type` and `canonical_key` filters must be SQL parameters and cast nullable params to text.
 - The expression uses PostgreSQL `simple` configuration and title boost:
 
 ```sql
@@ -95,6 +106,8 @@ Transaction boundary:
 | Repository create methods called | IDs are available after method returns | Repository tests assert persisted rows |
 | Duplicate ingest for same canonical source and content hash | Application skips new version creation | Ingest tests assert the existing version id is returned |
 | Changed content for same canonical source | Application creates a new source version and preserves old version | Ingest tests assert two versions for one source |
+| Optional search filters are omitted | Query still executes without PostgreSQL ambiguous parameter errors | Search tests call without filters |
+| Title and body both match | Title match sorts ahead when scores are otherwise close | `test_search_top_k_and_title_boost` |
 
 ### 5. Good/Base/Bad Cases
 
@@ -133,6 +146,7 @@ session.commit()
 - `tests/test_repositories.py`: repository write/read behavior and caller-owned commit.
 - `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
 - `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, and ingest job summaries.
+- `tests/test_search.py`: PostgreSQL FTS query, title boost, filters, top_k, no-results, and interface smoke tests.
 - Full PR-sized database changes must run `uv run pytest` with Docker PostgreSQL healthy.
 
 ### 7. Wrong vs Correct
@@ -158,6 +172,14 @@ def create_chunk(...):
 
 The database owns FTS generation and the caller owns transaction completion.
 
+Search must read the generated column:
+
+```sql
+where c.search_vector @@ websearch_to_tsquery('simple', :query)
+```
+
+Do not recalculate or overwrite `chunks.search_vector` in Python.
+
 ---
 
 ## Common Mistakes
@@ -165,3 +187,4 @@ The database owns FTS generation and the caller owns transaction completion.
 - Treating `content_hash` as source identity. It is version identity; `canonical_key` is the stable source identity.
 - Adding a model field without adding an Alembic migration and a schema assertion.
 - Committing inside repository methods, which makes multi-table ingest rollback unsafe.
+- Writing optional PostgreSQL filter clauses as `:source_type is null`; cast nullable params with `cast(:source_type as text)` so PostgreSQL can infer the type.

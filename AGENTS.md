@@ -34,8 +34,8 @@ This temporary block preserves only the confirmed MVP planning state. The detail
 
 * MVP PRD confirmed by user on 2026-06-04.
 * No open MVP decisions remain.
-* PR1, PR2, and PR3 have been implemented, verified, and committed.
-* Next engineering step: PR4 PostgreSQL FTS `SearchProvider` and `search_knowledge`.
+* PR1, PR2, PR3, and PR4 have been implemented, verified, and committed.
+* Next engineering step: PR5 `read_source` by `chunk_id` and source/version/locator.
 * M3-M5 planning remains future work.
 
 ## Workflow Rule
@@ -68,6 +68,7 @@ Core constraints:
 * Filters: `source_type`, `canonical_key`, `top_k`
 * Context Pack: JSON + Markdown, max 10 evidence, max 3 per source, soft `budget_tokens`, includes `Conflicts / Caveats`
 * Evidence must always map to `source_id`, `version_id`, and locator; `read_source` supports `chunk_id` and full source/version/locator addressing
+* Search: `SearchProvider` abstraction, PostgreSQL FTS provider, `search_knowledge`, title boost, `source_type`/`canonical_key`/`top_k` filters, stable evidence result shape
 
 Out of MVP scope:
 
@@ -85,7 +86,7 @@ Out of MVP scope:
 * PR1: scaffold, uv config, Docker Compose PostgreSQL, FastAPI health, FastMCP skeleton, Typer CLI skeleton - completed
 * PR2: Alembic schema, required indexes, FTS GIN index, Raw Archive writer, source/version/chunk/citation repositories - completed
 * PR3: AI conversation and Markdown/text ingest, structure-first chunking, duplicate/new-version behavior, ingest report - completed
-* PR4: PostgreSQL FTS SearchProvider, title boost, filters, search result shape
+* PR4: PostgreSQL FTS SearchProvider, title boost, filters, search result shape - completed
 * PR5: `read_source` by `chunk_id` and source/version/locator, with optional `context_lines`
 * PR6: Context Pack v0 JSON + Markdown, evidence caps, Caveats, soft `budget_tokens`
 * PR7: synthetic fixtures, `eval_queries.jsonl`, retrieval thresholds, docs, Codex-first MCP smoke test with generic MCP fallback

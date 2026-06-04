@@ -3,6 +3,7 @@ from mcp.server.fastmcp import FastMCP
 from pkcs.config import get_settings
 from pkcs.health import get_health_status
 from pkcs.ingest import IngestService
+from pkcs.search import SearchService
 
 
 def create_mcp_server() -> FastMCP:
@@ -23,6 +24,22 @@ def create_mcp_server() -> FastMCP:
             canonical_key=canonical_key,
         )
         return report.to_dict()
+
+    @server.tool()
+    def search_knowledge(
+        query: str,
+        source_type: str | None = None,
+        canonical_key: str | None = None,
+        top_k: int | None = None,
+    ) -> dict:
+        """Search ingested knowledge with PostgreSQL full-text search."""
+        response = SearchService.from_settings(settings).search_knowledge(
+            query=query,
+            source_type=source_type,
+            canonical_key=canonical_key,
+            top_k=top_k,
+        )
+        return response.to_dict()
 
     return server
 

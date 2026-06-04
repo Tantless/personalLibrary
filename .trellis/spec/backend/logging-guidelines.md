@@ -27,6 +27,7 @@ Current ingest events:
 ingest_file_succeeded
 ingest_file_skipped
 ingest_file_failed
+search_knowledge_completed
 ```
 
 ### 3. Contracts
@@ -34,6 +35,7 @@ ingest_file_failed
 - Include `event` in `extra` for machine-readable logs.
 - Include stable references when available: `source_id`, `version_id`, `source_type`, `chunks_created`.
 - For failures, include path and source_type, but not content.
+- For search, include `source_type`, `top_k`, and `result_count`; do not log the full query text.
 - `ingest_jobs.summary_json` is the durable MVP audit surface; logs are operational traces.
 
 ### 4. Validation & Error Matrix
@@ -43,6 +45,7 @@ ingest_file_failed
 | `source_id`, `version_id` | Yes | Stable non-content refs |
 | `canonical_key` | Use care | May contain local paths; prefer DB report over logs |
 | Local path | Yes for local MVP, but no content | Needed to debug ingest |
+| Search query text | No by default | May contain private intent or pasted content |
 | Chunk content or quote | No | Private source material |
 | Secret/env values | No | Credential leak risk |
 
@@ -54,6 +57,11 @@ Good:
 logger.info(
     "ingest_file_succeeded",
     extra={"event": "ingest_file_succeeded", "source_id": source_id, "chunks_created": chunks_created},
+)
+
+logger.info(
+    "search_knowledge_completed",
+    extra={"event": "search_knowledge_completed", "source_type": source_type, "top_k": top_k, "result_count": count},
 )
 ```
 

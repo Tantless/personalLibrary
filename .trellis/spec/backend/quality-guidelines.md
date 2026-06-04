@@ -29,7 +29,7 @@ git diff --check
 - Keep interface layers thin; CLI/MCP/HTTP should call shared services.
 - Do not introduce LangChain, LlamaIndex, Haystack, pgvector, OpenSearch, or rerankers in MVP PRs unless the PRD changes.
 - Do not write `chunks.search_vector` from application code.
-- Keep local-only behavior: no URL crawling, raw content upload, remote exposure, auth, or UI in MVP PR3.
+- Keep local-only behavior: no URL crawling, raw content upload, remote exposure, auth, or UI in MVP PRs.
 
 ### 4. Validation & Error Matrix
 
@@ -37,6 +37,7 @@ git diff --check
 |--------|-----------------------|
 | Parser behavior | Synthetic fixture tests |
 | Database writes | Docker-backed integration test |
+| PostgreSQL FTS search | Docker-backed search integration test |
 | CLI/MCP command | Interface smoke test |
 | Config key | `.env.example` update |
 | New code-spec convention | Update relevant `.trellis/spec/backend/*.md` |
@@ -62,6 +63,7 @@ assert result.exit_code == 0
 - Full suite: `uv run pytest`.
 - For database PRs: PostgreSQL must be healthy and Alembic must be at head.
 - For PR3 ingest: tests must cover file ingest, directory ingest, duplicate skip, new version creation, parser metadata, CLI, and MCP.
+- For PR4 search: tests must cover result shape, `source_type` filter, `canonical_key` filter, `top_k`, title boost, no-results behavior, CLI, and MCP.
 
 ### 7. Wrong vs Correct
 
@@ -72,3 +74,5 @@ Adding search ranking or Context Pack behavior during the ingest PR.
 #### Correct
 
 Store searchable chunks and citations now; implement ranking and Context Pack in their own PRs.
+
+For PR4, do not add `read_source` or Context Pack behavior; only return refs that those later PRs can consume.

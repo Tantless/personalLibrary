@@ -259,6 +259,33 @@ Notes:
 * PR3 does not implement search ranking, `read_source`, or Context Pack behavior; those remain PR4-PR6.
 * FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
 
+### PR4: PostgreSQL FTS Search
+
+Status: completed locally on 2026-06-04.
+
+Delivered:
+
+* `SearchProvider` abstraction.
+* PostgreSQL FTS provider using `websearch_to_tsquery('simple', query)` against the database-generated `chunks.search_vector`.
+* `SearchService.search_knowledge()` application workflow.
+* Ranking by PostgreSQL FTS rank plus explicit title match boost.
+* `source_type`, `canonical_key`, and `top_k` filters.
+* Stable search response shape with result/chunk/source/version refs, canonical key, title, source type, snippet, score, citation, and metadata.
+* Functional `pkcs search` CLI command.
+* FastMCP `search_knowledge` tool.
+* Docker-backed search tests for result shape, filters, top_k, title boost, no-results behavior, CLI, and MCP.
+* Backend code-spec updates for search module layout, FTS query contracts, search error behavior, logging, and quality requirements.
+
+Verified:
+
+* `uv run pytest tests/test_search.py` passed: 5 tests.
+* `uv run pytest` passed: 18 tests.
+
+Notes:
+
+* PR4 does not implement `read_source` or Context Pack behavior; those remain PR5 and PR6.
+* FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
+
 ## Final Acceptance Procedure
 
 MVP is accepted only when all of the following pass:

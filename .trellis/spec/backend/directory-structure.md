@@ -30,6 +30,10 @@ src/pkcs/
 │   ├── parsers.py          # File parsing and chunk construction
 │   └── service.py          # Ingest application workflow
 ├── mcp/server.py           # FastMCP tool wiring
+├── search/
+│   ├── models.py           # Search response/result contracts
+│   ├── providers.py        # SearchProvider abstraction and PostgreSQL FTS provider
+│   └── service.py          # Search application workflow
 └── storage/raw_archive.py  # Raw Archive filesystem writes
 ```
 
@@ -38,6 +42,7 @@ src/pkcs/
 - Interface layers (`cli.py`, `mcp/server.py`, future HTTP routes) must call application services.
 - Application services own transaction orchestration, input validation, and cross-repository workflows.
 - Parsers return plain data models and must not write to the database or filesystem.
+- Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
 - Repositories write ORM objects and call `flush()`, but callers own commits.
 - Storage helpers write bytes and return paths; they must not know database schema beyond path arguments passed in.
 
@@ -49,6 +54,7 @@ src/pkcs/
 | New parser | Add parser or ingest tests with synthetic fixtures |
 | New repository method | Update `database-guidelines.md` signatures and repository/ingest tests |
 | New cross-layer report field | Assert the field in service and interface tests |
+| New search result field | Assert the field in service and interface tests |
 
 ### 5. Good/Base/Bad Cases
 
@@ -59,6 +65,13 @@ report = IngestService.from_settings(settings).ingest_source(
     path=path,
     source_type=source_type,
     canonical_key=canonical_key,
+)
+
+response = SearchService.from_settings(settings).search_knowledge(
+    query=query,
+    source_type=source_type,
+    canonical_key=canonical_key,
+    top_k=top_k,
 )
 ```
 
@@ -74,6 +87,7 @@ def ingest(...):
 ### 6. Tests Required
 
 - Shared service behavior: `tests/test_ingest.py`.
+- Search behavior: `tests/test_search.py`.
 - Interface smoke tests: CLI and MCP tests for commands/tools that call the service.
 - Data-layer changes: `tests/test_database_schema.py` and `tests/test_repositories.py`.
 
@@ -85,4 +99,4 @@ Duplicating ingest logic in `cli.py` and `mcp/server.py`.
 
 #### Correct
 
-Keep both interface layers thin and call `IngestService`.
+Keep interface layers thin and call `IngestService` or `SearchService`.
