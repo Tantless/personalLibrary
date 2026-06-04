@@ -14,11 +14,22 @@ class SourceRepository:
     def get_by_canonical_key(self, canonical_key: str) -> Source | None:
         return self.session.scalar(select(Source).where(Source.canonical_key == canonical_key))
 
+    def get(self, source_id: str) -> Source | None:
+        return self.session.get(Source, source_id)
+
     def get_version_by_hash(self, *, source_id: str, content_hash: str) -> SourceVersion | None:
         return self.session.scalar(
             select(SourceVersion).where(
                 SourceVersion.source_id == source_id,
                 SourceVersion.content_hash == content_hash,
+            )
+        )
+
+    def get_version(self, *, source_id: str, version_id: str) -> SourceVersion | None:
+        return self.session.scalar(
+            select(SourceVersion).where(
+                SourceVersion.source_id == source_id,
+                SourceVersion.id == version_id,
             )
         )
 
@@ -114,6 +125,15 @@ class ChunkRepository:
 
     def get(self, chunk_id: str) -> Chunk | None:
         return self.session.get(Chunk, chunk_id)
+
+    def get_by_locator(self, *, source_id: str, version_id: str, locator: str) -> Chunk | None:
+        return self.session.scalar(
+            select(Chunk).where(
+                Chunk.source_id == source_id,
+                Chunk.version_id == version_id,
+                Chunk.locator == locator,
+            )
+        )
 
 
 class CitationRepository:

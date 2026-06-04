@@ -22,6 +22,7 @@ Completed PR-sized steps:
 * PR2: Alembic schema, required indexes, database-generated PostgreSQL FTS vector, Raw Archive writer, repositories.
 * PR3: local file ingest for Markdown/text documents and AI conversations, duplicate hash skip, new-version behavior, CLI ingest, MCP `ingest_source`.
 * PR4: PostgreSQL FTS search provider, CLI search, MCP `search_knowledge`, filters, title boost, and stable evidence result shape.
+* PR5: Raw Archive backed `read_source`, CLI read, MCP `read_source`, `chunk_id` and source/version/locator addressing.
 
 ## Local Setup
 
@@ -118,3 +119,29 @@ The search response contains:
 MCP exposes the same behavior as `search_knowledge`.
 
 No-result searches return an empty `results` list. PR4 does not implement `read_source` or Context Pack generation.
+
+## Read Source
+
+PR5 reads source evidence back from Raw Archive, not from the current original file path. This preserves version traceability if the original file moves or changes after ingest.
+
+Read by search result `chunk_id`:
+
+```powershell
+uv run pkcs read --chunk-id <chunk_id>
+```
+
+Read by full citation:
+
+```powershell
+uv run pkcs read --source-id <source_id> --version-id <version_id> --locator "line 4-7"
+```
+
+Include surrounding context lines:
+
+```powershell
+uv run pkcs read --chunk-id <chunk_id> --context-lines 2
+```
+
+The read response contains source refs, locator, citation line range, returned context line range, fragment `content`, and metadata. PR5 defaults to returning the citation lines only; it does not return the whole source by default.
+
+MCP exposes the same behavior as `read_source`.

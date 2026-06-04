@@ -30,6 +30,10 @@ src/pkcs/
 │   ├── parsers.py          # File parsing and chunk construction
 │   └── service.py          # Ingest application workflow
 ├── mcp/server.py           # FastMCP tool wiring
+├── reader/
+│   ├── locators.py         # Locator parsing and formatting
+│   ├── models.py           # Source fragment response contracts
+│   └── service.py          # Raw Archive backed source fragment reading
 ├── search/
 │   ├── models.py           # Search response/result contracts
 │   ├── providers.py        # SearchProvider abstraction and PostgreSQL FTS provider
@@ -43,6 +47,7 @@ src/pkcs/
 - Application services own transaction orchestration, input validation, and cross-repository workflows.
 - Parsers return plain data models and must not write to the database or filesystem.
 - Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
+- Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.
 - Repositories write ORM objects and call `flush()`, but callers own commits.
 - Storage helpers write bytes and return paths; they must not know database schema beyond path arguments passed in.
 
@@ -55,6 +60,7 @@ src/pkcs/
 | New repository method | Update `database-guidelines.md` signatures and repository/ingest tests |
 | New cross-layer report field | Assert the field in service and interface tests |
 | New search result field | Assert the field in service and interface tests |
+| New reader result field | Assert the field in service and interface tests |
 
 ### 5. Good/Base/Bad Cases
 
@@ -73,6 +79,14 @@ response = SearchService.from_settings(settings).search_knowledge(
     canonical_key=canonical_key,
     top_k=top_k,
 )
+
+fragment = ReadSourceService.from_settings(settings).read_source(
+    chunk_id=chunk_id,
+    source_id=source_id,
+    version_id=version_id,
+    locator=locator,
+    context_lines=context_lines,
+)
 ```
 
 Bad:
@@ -88,6 +102,7 @@ def ingest(...):
 
 - Shared service behavior: `tests/test_ingest.py`.
 - Search behavior: `tests/test_search.py`.
+- Reader behavior: `tests/test_reader.py`.
 - Interface smoke tests: CLI and MCP tests for commands/tools that call the service.
 - Data-layer changes: `tests/test_database_schema.py` and `tests/test_repositories.py`.
 
@@ -99,4 +114,4 @@ Duplicating ingest logic in `cli.py` and `mcp/server.py`.
 
 #### Correct
 
-Keep interface layers thin and call `IngestService` or `SearchService`.
+Keep interface layers thin and call `IngestService`, `SearchService`, or `ReadSourceService`.

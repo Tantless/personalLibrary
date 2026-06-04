@@ -3,6 +3,7 @@ from mcp.server.fastmcp import FastMCP
 from pkcs.config import get_settings
 from pkcs.health import get_health_status
 from pkcs.ingest import IngestService
+from pkcs.reader import ReadSourceService
 from pkcs.search import SearchService
 
 
@@ -40,6 +41,24 @@ def create_mcp_server() -> FastMCP:
             top_k=top_k,
         )
         return response.to_dict()
+
+    @server.tool()
+    def read_source(
+        chunk_id: str | None = None,
+        source_id: str | None = None,
+        version_id: str | None = None,
+        locator: str | None = None,
+        context_lines: int = 0,
+    ) -> dict:
+        """Read a source fragment by chunk id or source/version/locator."""
+        fragment = ReadSourceService.from_settings(settings).read_source(
+            chunk_id=chunk_id,
+            source_id=source_id,
+            version_id=version_id,
+            locator=locator,
+            context_lines=context_lines,
+        )
+        return fragment.to_dict()
 
     return server
 

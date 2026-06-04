@@ -286,6 +286,35 @@ Notes:
 * PR4 does not implement `read_source` or Context Pack behavior; those remain PR5 and PR6.
 * FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
 
+### PR5: Read Source
+
+Status: completed locally on 2026-06-04.
+
+Delivered:
+
+* `ReadSourceService.read_source()` application workflow.
+* `line N-M` locator parser and formatter.
+* Raw Archive backed source fragment reading from `source_versions.raw_archive_path`.
+* `chunk_id` shortcut addressing.
+* Full `source_id` + `version_id` + `locator` addressing.
+* Optional `context_lines` support without returning whole sources by default.
+* Functional `pkcs read` CLI command.
+* FastMCP `read_source` tool.
+* Stable read response shape with source refs, locator, citation lines, returned context line range, content, and metadata.
+* Reader error handling for missing chunk, invalid locator, missing source/version, missing Raw Archive file, negative context lines, and incomplete addressing.
+* Docker-backed reader tests for chunk lookup, full citation lookup, context lines, invalid refs, CLI, and MCP.
+* Backend code-spec updates for reader module layout, Raw Archive read contracts, read errors, logging, and quality requirements.
+
+Verified:
+
+* `uv run pytest tests/test_reader.py` passed: 5 tests.
+* `uv run pytest` passed: 23 tests.
+
+Notes:
+
+* PR5 does not implement Context Pack behavior; that remains PR6.
+* FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
+
 ## Final Acceptance Procedure
 
 MVP is accepted only when all of the following pass:

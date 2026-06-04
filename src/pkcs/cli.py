@@ -6,6 +6,7 @@ import typer
 from pkcs.config import get_settings
 from pkcs.health import get_health_status
 from pkcs.ingest import IngestService
+from pkcs.reader import ReadSourceService
 from pkcs.search import SearchService
 
 app = typer.Typer(help="Personal Knowledge Context Server CLI")
@@ -51,9 +52,22 @@ def search(
 
 
 @app.command("read")
-def read_source() -> None:
-    """Placeholder for MVP read_source command."""
-    raise typer.BadParameter("read is not implemented in PR1")
+def read_source(
+    chunk_id: str | None = typer.Option(None, "--chunk-id", help="Chunk id shortcut."),
+    source_id: str | None = typer.Option(None, "--source-id", help="Source id for full citation addressing."),
+    version_id: str | None = typer.Option(None, "--version-id", help="Version id for full citation addressing."),
+    locator: str | None = typer.Option(None, "--locator", help="Line locator, for example 'line 1-3'."),
+    context_lines: int = typer.Option(0, "--context-lines", min=0, help="Optional lines before and after citation."),
+) -> None:
+    """Read a source fragment by chunk id or source/version/locator."""
+    fragment = ReadSourceService.from_settings(get_settings()).read_source(
+        chunk_id=chunk_id,
+        source_id=source_id,
+        version_id=version_id,
+        locator=locator,
+        context_lines=context_lines,
+    )
+    typer.echo(json.dumps(fragment.to_dict(), ensure_ascii=False))
 
 
 @app.command("context-pack")

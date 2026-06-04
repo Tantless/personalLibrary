@@ -19,6 +19,7 @@ Error classes:
 IngestInputError(ValueError)
 IngestParseError(ValueError)
 SearchInputError(ValueError)
+ReadSourceError(ValueError)
 ```
 
 Report fields:
@@ -45,6 +46,12 @@ Search behavior:
 - Search with no matches returns a valid response with `results: []`; it is not an error.
 - Interface layers should return the stable search response shape for zero and nonzero results.
 
+Read source behavior:
+
+- `ReadSourceError` covers missing chunk, missing source, missing version, invalid locator, missing Raw Archive file, negative `context_lines`, and incomplete addressing.
+- `read_source()` must accept either `chunk_id` or all of `source_id`, `version_id`, and `locator`.
+- Invalid locators must fail before any Raw Archive read.
+
 ### 4. Validation & Error Matrix
 
 | Case | Expected behavior |
@@ -58,6 +65,10 @@ Search behavior:
 | Empty search query | `SearchInputError` |
 | Unsupported search `source_type` | `SearchInputError` |
 | Search no results | Valid response with empty `results` |
+| Missing `chunk_id` | `ReadSourceError` |
+| Missing source/version | `ReadSourceError` |
+| Invalid `line N-M` locator | `ReadSourceError` |
+| Negative `context_lines` | `ReadSourceError` |
 
 ### 5. Good/Base/Bad Cases
 
@@ -83,6 +94,7 @@ for file_path in files:
 
 - `tests/test_ingest.py::test_ingest_directory_is_non_recursive_and_continues_after_file_failure`
 - `tests/test_search.py::test_search_no_results_returns_empty_list`
+- `tests/test_reader.py::test_read_source_invalid_locator_and_missing_chunk_errors`
 - Add a test whenever a new error status or input validation branch is introduced.
 
 ### 7. Wrong vs Correct

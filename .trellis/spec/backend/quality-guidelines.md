@@ -38,6 +38,7 @@ git diff --check
 | Parser behavior | Synthetic fixture tests |
 | Database writes | Docker-backed integration test |
 | PostgreSQL FTS search | Docker-backed search integration test |
+| Raw Archive source reading | Docker-backed reader integration test |
 | CLI/MCP command | Interface smoke test |
 | Config key | `.env.example` update |
 | New code-spec convention | Update relevant `.trellis/spec/backend/*.md` |
@@ -64,6 +65,7 @@ assert result.exit_code == 0
 - For database PRs: PostgreSQL must be healthy and Alembic must be at head.
 - For PR3 ingest: tests must cover file ingest, directory ingest, duplicate skip, new version creation, parser metadata, CLI, and MCP.
 - For PR4 search: tests must cover result shape, `source_type` filter, `canonical_key` filter, `top_k`, title boost, no-results behavior, CLI, and MCP.
+- For PR5 reader: tests must cover `chunk_id`, source/version/locator addressing, `context_lines`, invalid locator/missing refs, CLI, and MCP.
 
 ### 7. Wrong vs Correct
 
@@ -76,3 +78,5 @@ Adding search ranking or Context Pack behavior during the ingest PR.
 Store searchable chunks and citations now; implement ranking and Context Pack in their own PRs.
 
 For PR4, do not add `read_source` or Context Pack behavior; only return refs that those later PRs can consume.
+
+For PR5, do not add Context Pack behavior; return source fragments that PR6 can consume.

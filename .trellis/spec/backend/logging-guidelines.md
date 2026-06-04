@@ -28,6 +28,7 @@ ingest_file_succeeded
 ingest_file_skipped
 ingest_file_failed
 search_knowledge_completed
+read_source_completed
 ```
 
 ### 3. Contracts
@@ -36,6 +37,7 @@ search_knowledge_completed
 - Include stable references when available: `source_id`, `version_id`, `source_type`, `chunks_created`.
 - For failures, include path and source_type, but not content.
 - For search, include `source_type`, `top_k`, and `result_count`; do not log the full query text.
+- For `read_source`, include source/version/chunk refs and `context_lines`; do not log returned content.
 - `ingest_jobs.summary_json` is the durable MVP audit surface; logs are operational traces.
 
 ### 4. Validation & Error Matrix
@@ -46,6 +48,7 @@ search_knowledge_completed
 | `canonical_key` | Use care | May contain local paths; prefer DB report over logs |
 | Local path | Yes for local MVP, but no content | Needed to debug ingest |
 | Search query text | No by default | May contain private intent or pasted content |
+| `read_source` returned content | No | Direct source material |
 | Chunk content or quote | No | Private source material |
 | Secret/env values | No | Credential leak risk |
 
@@ -62,6 +65,11 @@ logger.info(
 logger.info(
     "search_knowledge_completed",
     extra={"event": "search_knowledge_completed", "source_type": source_type, "top_k": top_k, "result_count": count},
+)
+
+logger.info(
+    "read_source_completed",
+    extra={"event": "read_source_completed", "source_id": source_id, "version_id": version_id, "context_lines": context_lines},
 )
 ```
 
