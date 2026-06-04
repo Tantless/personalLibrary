@@ -37,6 +37,10 @@ This temporary block preserves only the confirmed MVP planning state. The detail
 * Next engineering step: run Trellis Phase 2 preparation for `.trellis/tasks/06-03-pkcs-mvp-m1-m2` before implementation.
 * M3-M5 planning remains future work.
 
+## Workflow Rule
+
+After each complete PR-sized step is implemented and verified, inspect the working tree. If the changed content is coherent and committable, commit it immediately with a focused commit message before starting the next PR-sized step.
+
 ## MVP Scope
 
 PKCS MVP combines M1 + M2: agent access, Raw Archive, PostgreSQL metadata, AI conversation and Markdown/text ingest, PostgreSQL FTS search, `read_source`, and Context Pack v0.
