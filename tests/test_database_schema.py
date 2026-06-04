@@ -17,7 +17,7 @@ def test_initial_schema_and_indexes(db_session) -> None:
     assert "ix_chunks_search_vector" in chunk_indexes
 
 
-def test_schema_tables_and_columns_have_chinese_comments(db_session) -> None:
+def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> None:
     expected_tables = {"sources", "source_versions", "chunks", "citations", "ingest_jobs", "alembic_version"}
 
     table_comments = db_session.execute(
@@ -55,10 +55,27 @@ def test_schema_tables_and_columns_have_chinese_comments(db_session) -> None:
     missing_column_comments = [
         (row["table_name"], row["column_name"]) for row in column_comments if not (row["comment"] or "").strip()
     ]
+    malformed_table_comments = [
+        (row["table_name"], row["comment"]) for row in table_comments if not _is_name_explanation_comment(row["comment"])
+    ]
+    malformed_column_comments = [
+        (row["table_name"], row["column_name"], row["comment"])
+        for row in column_comments
+        if not _is_name_explanation_comment(row["comment"])
+    ]
 
     assert {row["table_name"] for row in table_comments} == expected_tables
     assert not missing_table_comments
     assert not missing_column_comments
+    assert not malformed_table_comments
+    assert not malformed_column_comments
+
+
+def _is_name_explanation_comment(comment: str | None) -> bool:
+    if comment is None or "：" not in comment or len(comment) > 60:
+        return False
+    name, explanation = comment.split("：", 1)
+    return bool(name.strip()) and bool(explanation.strip())
 
 
 def test_chunks_search_vector_is_database_generated(db_session) -> None:
