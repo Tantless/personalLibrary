@@ -1,51 +1,160 @@
 # Database Guidelines
 
-> Database patterns and conventions for this project.
+> Executable database contracts for the PKCS backend.
 
 ---
 
-## Overview
+## Scenario: PKCS MVP Database Schema
 
-<!--
-Document your project's database conventions here.
+### 1. Scope / Trigger
 
-Questions to answer:
-- What ORM/query library do you use?
-- How are migrations managed?
-- What are the naming conventions for tables/columns?
-- How do you handle transactions?
--->
+- Trigger: Any change to SQLAlchemy models, Alembic migrations, repository write behavior, Raw Archive database references, or PostgreSQL full-text search fields.
+- Runtime: PostgreSQL from Docker Compose is the default MVP database.
+- Stack: SQLAlchemy ORM models in `src/pkcs/db/models.py`, Alembic migrations in `migrations/versions/`, sessions from `src/pkcs/db/session.py`, and repository wrappers in `src/pkcs/db/repositories.py`.
 
-(To be filled by the team)
+### 2. Signatures
 
----
+Commands:
 
-## Query Patterns
+```bash
+docker compose up -d postgres
+uv run alembic upgrade head
+uv run pytest tests/test_database_schema.py tests/test_repositories.py
+```
 
-<!-- How should queries be written? Batch operations? -->
+Configuration:
 
-(To be filled by the team)
+```env
+PKCS_DATABASE_URL=postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs
+```
 
----
+Repository constructors:
 
-## Migrations
+```python
+SourceRepository(session: Session)
+ChunkRepository(session: Session)
+CitationRepository(session: Session)
+IngestJobRepository(session: Session)
+```
 
-<!-- How to create and run migrations -->
+Required write methods:
 
-(To be filled by the team)
+```python
+SourceRepository.create_source(canonical_key, title, source_type, origin_uri=None)
+SourceRepository.create_version(source, content_hash, file_path, raw_archive_path, status="imported", metadata_json=None)
+ChunkRepository.create_chunk(source_id, version_id, chunk_index, title, source_type, locator, line_start, line_end, content, ...)
+CitationRepository.create_citation(source_id, version_id, chunk_id, locator, line_start, line_end, quote=None, metadata_json=None)
+IngestJobRepository.create_job(source_type, input_path, status="started", summary_json=None)
+```
 
----
+### 3. Contracts
 
-## Naming Conventions
+Core tables:
 
-<!-- Table names, column names, index names -->
+- `sources`: one stable source identity per `canonical_key`; `source_type` is indexed; `current_version_id` points at the latest imported version.
+- `source_versions`: immutable source versions; `(source_id, content_hash)` and `(source_id, version_number)` are unique; `raw_archive_path` must point to the archived raw file.
+- `chunks`: searchable evidence units; `(version_id, chunk_index)` is unique; locator fields use `locator`, `line_start`, and `line_end`.
+- `citations`: source/version/chunk-linked evidence references for future `read_source` and Context Pack output.
+- `ingest_jobs`: MVP audit surface for ingest status and per-run summaries.
 
-(To be filled by the team)
+Full-text search:
+
+- `chunks.search_vector` is a PostgreSQL generated column.
+- Application code must not write `search_vector`.
+- The expression uses PostgreSQL `simple` configuration and title boost:
+
+```sql
+setweight(to_tsvector('simple', coalesce(title, '')), 'A') ||
+setweight(to_tsvector('simple', coalesce(content, '')), 'B')
+```
+
+Indexes:
+
+- `ix_chunks_search_vector` must be a GIN index.
+- Keep indexes for `source_type`, `source_id`, `version_id`, `content_hash`, and ingest `status` when changing schema.
+
+Transaction boundary:
+
+- Repositories call `session.flush()` to materialize IDs and constraints.
+- Callers own `commit()` and `rollback()`.
+- Do not hide transaction commits inside repositories.
+
+### 4. Validation & Error Matrix
+
+| Case | Expected behavior | Required assertion |
+|------|-------------------|--------------------|
+| PostgreSQL unavailable | Integration tests skip with a clear pytest skip reason | `tests/conftest.py` connectivity gate |
+| Duplicate `sources.canonical_key` | Database rejects the duplicate | Unique constraint remains present |
+| Duplicate `(source_id, content_hash)` | Database rejects duplicate source version content | `uq_source_versions_source_hash` remains present |
+| Duplicate `(version_id, chunk_index)` | Database rejects duplicate chunk order | `uq_chunks_version_chunk_index` remains present |
+| Insert chunk without `search_vector` | Database generates `search_vector` | `test_chunks_search_vector_is_database_generated` |
+| Repository create methods called | IDs are available after method returns | Repository tests assert persisted rows |
+
+### 5. Good/Base/Bad Cases
+
+Good:
+
+```python
+source = SourceRepository(session).create_source(
+    canonical_key="markdown_doc:C:/notes/example.md",
+    title="example.md",
+    source_type="markdown_doc",
+)
+version = SourceRepository(session).create_version(
+    source=source,
+    content_hash="sha256hex",
+    file_path="C:/notes/example.md",
+    raw_archive_path="data/raw/markdown_doc/source/version/example.md",
+)
+session.commit()
+```
+
+Base:
+
+- Run `uv run alembic upgrade head` before database integration tests.
+- Use repositories for application writes; use direct SQL only in schema-focused tests.
+
+Bad:
+
+```python
+chunk.search_vector = "manually generated value"
+session.commit()
+```
+
+### 6. Tests Required
+
+- `tests/test_database_schema.py`: table presence, required indexes, generated `search_vector`.
+- `tests/test_repositories.py`: repository write/read behavior and caller-owned commit.
+- `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
+- Full PR-sized database changes must run `uv run pytest` with Docker PostgreSQL healthy.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```python
+def create_chunk(...):
+    chunk = Chunk(..., search_vector=make_vector(content))
+    session.add(chunk)
+    session.commit()
+```
+
+#### Correct
+
+```python
+def create_chunk(...):
+    chunk = Chunk(...)
+    session.add(chunk)
+    session.flush()
+    return chunk
+```
+
+The database owns FTS generation and the caller owns transaction completion.
 
 ---
 
 ## Common Mistakes
 
-<!-- Database-related mistakes your team has made -->
-
-(To be filled by the team)
+- Treating `content_hash` as source identity. It is version identity; `canonical_key` is the stable source identity.
+- Adding a model field without adding an Alembic migration and a schema assertion.
+- Committing inside repository methods, which makes multi-table ingest rollback unsafe.

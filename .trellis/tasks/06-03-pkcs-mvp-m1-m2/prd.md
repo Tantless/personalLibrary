@@ -201,6 +201,31 @@ Notes:
 * FastAPI TestClient emits a Starlette deprecation warning about `httpx`; it does not fail tests.
 * `ingest`, `search`, `read`, and `context-pack` CLI commands are placeholders by design until later PRs.
 
+### PR2: Schema, Raw Archive, and Repositories
+
+Status: completed locally on 2026-06-04.
+
+Delivered:
+
+* Alembic configuration and initial migration.
+* PostgreSQL tables: `sources`, `source_versions`, `chunks`, `citations`, `ingest_jobs`.
+* Required schema indexes and PostgreSQL FTS GIN index.
+* Database-generated `chunks.search_vector` using PostgreSQL `simple` FTS configuration.
+* SQLAlchemy models and sync session helper.
+* Repository layer for source/version/chunk/citation/ingest job CRUD.
+* `RawArchiveWriter` writing under source_type/source_id/version_id.
+* Docker-backed integration tests for schema, generated FTS vector, repository round-trip, and Raw Archive path behavior.
+
+Verified:
+
+* `uv run alembic upgrade head` succeeded.
+* `uv run pytest` passed: 7 tests.
+
+Notes:
+
+* PR2 does not implement ingest parsing or search service behavior; it only creates the data layer needed by PR3 and PR4.
+* FastAPI TestClient still emits a Starlette deprecation warning about `httpx`; it does not fail tests.
+
 ## Final Acceptance Procedure
 
 MVP is accepted only when all of the following pass:
