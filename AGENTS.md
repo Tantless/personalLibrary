@@ -22,44 +22,78 @@ Keep this managed block so 'trellis update' can refresh the instructions.
 <!-- TRELLIS:END -->
 
 <!-- PKCS-PLANNING:TEMP-START -->
-# Temporary PKCS Planning Context
+# Temporary PKCS MVP Context
 
-This block is temporary planning memory for the PRD clarification phase. The user said they will manually delete it after the PRD clarification stage ends.
+This temporary block preserves only the confirmed MVP planning state. The detailed decisions live in:
 
-## Current Planning Task
+* Parent planning PRD: `.trellis/tasks/06-03-pkcs-project-plan/prd.md`
+* Confirmed MVP PRD: `.trellis/tasks/06-03-pkcs-mvp-m1-m2/prd.md`
+* Source design doc: `personal_knowledge_context_server_design.md`
 
-* Task: `.trellis/tasks/06-03-pkcs-project-plan`
-* PRD: `.trellis/tasks/06-03-pkcs-project-plan/prd.md`
-* Source design document: `personal_knowledge_context_server_design.md`
-* User intent: read the design document, organize the full project roadmap, clarify PRDs phase by phase, and make sure both user and agent share explicit definitions for how the project starts, proceeds, is accepted, and is considered complete.
+## Current State
 
-## PKCS Project Summary
+* MVP PRD confirmed by user on 2026-06-04.
+* No open MVP decisions remain.
+* Next engineering step: run Trellis Phase 2 preparation for `.trellis/tasks/06-03-pkcs-mvp-m1-m2` before implementation.
+* M3-M5 planning remains future work.
 
-Personal Knowledge Context Server (PKCS) is a personal knowledge backend service for external agents such as Claude Code, Codex, OpenClaw, IDE agents, local agents, scripts, and future custom workflows.
+## MVP Scope
 
-The service is not a chat UI and does not replace the main agent. It provides searchable, traceable, compressed context materials. Its core output is a Context Pack that the main agent can inject into its own working context.
+PKCS MVP combines M1 + M2: agent access, Raw Archive, PostgreSQL metadata, AI conversation and Markdown/text ingest, PostgreSQL FTS search, `read_source`, and Context Pack v0.
 
-## Working Principles During Clarification
+Core stack:
 
-* Use `$brainstorm` behavior: task-first, action-before-asking, one high-value question at a time.
-* Update the PRD immediately after each confirmed decision.
-* Keep MVP scope small and avoid speculative features.
-* Prefer stable external tool interfaces before optimizing internal retrieval implementation.
-* Preserve raw source evidence and citation traceability as a non-negotiable project principle.
+* Python + uv
+* FastAPI for local HTTP
+* Official MCP Python SDK with `FastMCP`
+* Typer CLI
+* Docker Compose PostgreSQL
+* SQLAlchemy + Alembic
+* Pydantic Settings
+* pytest + pytest-asyncio
 
-## Current Roadmap Draft
+Core constraints:
 
-* M1: 接入骨架与数据底座 - Agent can call the service, raw data is archived, metadata is stored, and original evidence can be read back.
-* M2: 摄入与基础检索 MVP - selected source types can be ingested, chunked, indexed, searched, and cited.
-* M3: 检索编排与 Context Pack - query routing, multi-retriever fusion, reranking, and context pack generation.
-* M4: 特色知识源增强 - code, AI conversations, email, entities, official docs, and work knowledge get specialized retrieval.
-* M5: 知识沉淀、安全、评测与运维 - LLM Wiki, decisions, belief history, permissions, anti-pollution controls, evals, backup, and recovery.
+* Source types: `ai_conversation`, `markdown_doc`
+* Input: local file paths only; single file or non-recursive directory
+* AI conversation formats: Markdown/transcript and JSONL
+* Document formats: local `.md` and `.txt` only
+* Raw Archive: project-local `data/raw/`, gitignored
+* Search: PostgreSQL FTS with `simple`, database-generated `search_vector`, FTS GIN index, FTS rank + title boost
+* Filters: `source_type`, `canonical_key`, `top_k`
+* Context Pack: JSON + Markdown, max 10 evidence, max 3 per source, soft `budget_tokens`, includes `Conflicts / Caveats`
+* Evidence must always map to `source_id`, `version_id`, and locator; `read_source` supports `chunk_id` and full source/version/locator addressing
 
-## Open Decisions
+Out of MVP scope:
 
-* MVP interface shape: MCP-only, HTTP-only, or MCP + HTTP.
-* MVP source types: AI conversations + Markdown only, or also GitHub repo ingest v0.
-* MVP search backend: lightweight local search first, PostgreSQL FTS/pgvector, or PostgreSQL + OpenSearch.
-* Context Pack v0 format: JSON, Markdown, or JSON + Markdown hybrid.
+* Code repo ingest or code chunking
+* Email ingest
+* LangChain/LlamaIndex/Haystack as core dependencies
+* pgvector, OpenSearch, reranker, GraphRAG
+* HTML/PDF/docx parsing, URL crawling, raw content upload
+* Remote exposure, auth, audit log table
+* Backup/restore/reindex commands
+* UI, full LLM Wiki, autonomous multi-agent workflow
+
+## Execution Plan
+
+* PR1: scaffold, uv config, Docker Compose PostgreSQL, FastAPI health, FastMCP skeleton, Typer CLI skeleton
+* PR2: Alembic schema, required indexes, FTS GIN index, Raw Archive writer, source/version/chunk/citation repositories
+* PR3: AI conversation and Markdown/text ingest, structure-first chunking, duplicate/new-version behavior, ingest report
+* PR4: PostgreSQL FTS SearchProvider, title boost, filters, search result shape
+* PR5: `read_source` by `chunk_id` and source/version/locator, with optional `context_lines`
+* PR6: Context Pack v0 JSON + Markdown, evidence caps, Caveats, soft `budget_tokens`
+* PR7: synthetic fixtures, `eval_queries.jsonl`, retrieval thresholds, docs, Codex-first MCP smoke test with generic MCP fallback
+
+## Acceptance Summary
+
+MVP is complete only when:
+
+* Unit tests and Docker-backed integration tests pass.
+* At least 10 synthetic/non-private AI conversation samples and 10 Markdown/text samples ingest successfully.
+* At least 20 eval queries reach top 10 >= 80% and top 5 >= 60%.
+* CLI, FastAPI health, MCP health, and Codex-first MCP smoke test pass.
+* Every search result and Context Pack evidence maps back to `read_source`.
+* Docs cover setup, config, ingest, search, `read_source`, Context Pack, testing, and limitations.
 
 <!-- PKCS-PLANNING:TEMP-END -->

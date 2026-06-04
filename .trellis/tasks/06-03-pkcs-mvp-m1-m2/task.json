@@ -1,10 +1,10 @@
 {
-  "id": "pkcs-project-plan",
-  "name": "pkcs-project-plan",
-  "title": "brainstorm: Personal Knowledge Context Server project plan",
-  "description": "Read the PKCS design document, organize project roadmap, clarify PRDs phase by phase, and preserve planning context in AGENTS.md during clarification.",
+  "id": "pkcs-mvp-m1-m2",
+  "name": "pkcs-mvp-m1-m2",
+  "title": "PKCS MVP: M1+M2 agent access and basic retrieval",
+  "description": "Implement the first PKCS MVP by combining M1 and M2: MCP-first access, local HTTP support, raw archive, PostgreSQL metadata, AI conversation and Markdown/Web ingest, full-text search, read_source, and Context Pack v0.",
   "status": "planning",
-  "dev_type": null,
+  "dev_type": "backend",
   "scope": null,
   "package": null,
   "priority": "P1",
@@ -45,10 +45,8 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [
-    "06-03-pkcs-mvp-m1-m2"
-  ],
-  "parent": null,
+  "children": [],
+  "parent": "06-03-pkcs-project-plan",
   "relatedFiles": [],
   "notes": "",
   "meta": {}

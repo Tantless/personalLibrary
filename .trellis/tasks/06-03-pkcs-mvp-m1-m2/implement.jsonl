@@ -1,0 +1,13 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/tasks/06-03-pkcs-mvp-m1-m2/prd.md", "reason": "Confirmed MVP PRD and implementation plan"}
+{"file": ".trellis/tasks/06-03-pkcs-project-plan/prd.md", "reason": "Parent planning PRD and ADR history"}
+{"file": "AGENTS.md", "reason": "Temporary MVP context and project instructions"}
+{"file": "personal_knowledge_context_server_design.md", "reason": "Original PKCS design document"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Backend structure guidelines, currently template but mandatory to read"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Database guidelines, currently template but relevant to schema work"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Error handling guidelines, currently template but relevant to API/service boundaries"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Logging guidelines, currently template but relevant to structured JSON logging"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Backend quality guidelines, currently template but relevant to tests"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Shared guide: search before adding utilities and avoid duplication"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Shared guide: data flow spans interface, service, DB, and evidence output"}
