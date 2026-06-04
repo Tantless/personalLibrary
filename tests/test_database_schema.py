@@ -17,6 +17,50 @@ def test_initial_schema_and_indexes(db_session) -> None:
     assert "ix_chunks_search_vector" in chunk_indexes
 
 
+def test_schema_tables_and_columns_have_chinese_comments(db_session) -> None:
+    expected_tables = {"sources", "source_versions", "chunks", "citations", "ingest_jobs", "alembic_version"}
+
+    table_comments = db_session.execute(
+        text(
+            """
+            select c.relname as table_name, obj_description(c.oid, 'pg_class') as comment
+            from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public'
+              and c.relkind = 'r'
+              and c.relname in ('sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs', 'alembic_version')
+            """
+        )
+    ).mappings().all()
+    column_comments = db_session.execute(
+        text(
+            """
+            select c.relname as table_name, a.attname as column_name, col_description(c.oid, a.attnum) as comment
+            from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            join pg_attribute a on a.attrelid = c.oid
+            where n.nspname = 'public'
+              and c.relkind = 'r'
+              and c.relname in ('sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs', 'alembic_version')
+              and a.attnum > 0
+              and not a.attisdropped
+            order by c.relname, a.attnum
+            """
+        )
+    ).mappings().all()
+
+    missing_table_comments = [
+        row["table_name"] for row in table_comments if not (row["comment"] or "").strip()
+    ]
+    missing_column_comments = [
+        (row["table_name"], row["column_name"]) for row in column_comments if not (row["comment"] or "").strip()
+    ]
+
+    assert {row["table_name"] for row in table_comments} == expected_tables
+    assert not missing_table_comments
+    assert not missing_column_comments
+
+
 def test_chunks_search_vector_is_database_generated(db_session) -> None:
     source_id = "schema-source"
     version_id = "schema-version"
@@ -80,4 +124,3 @@ def test_chunks_search_vector_is_database_generated(db_session) -> None:
 
     assert generated is not None
     assert "context" in generated
-

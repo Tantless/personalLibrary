@@ -37,6 +37,7 @@ This temporary block preserves only the confirmed MVP planning state. The detail
 * PR1, PR2, PR3, PR4, PR5, PR6, and PR7 have been implemented and verified locally.
 * PR7 covers synthetic fixture corpus, eval queries, retrieval thresholds, docs, and MCP smoke acceptance.
 * After the PR7 commit, the M1+M2 MVP implementation PRD should be considered complete locally.
+* Post-MVP database usability update: PostgreSQL table and column Chinese comments are added through Alembic revision `20260604_0002`.
 * M3-M5 planning remains future work.
 
 ## Workflow Rule

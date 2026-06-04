@@ -86,6 +86,13 @@ Core tables:
 - `citations`: source/version/chunk-linked evidence references for future `read_source` and Context Pack output.
 - `ingest_jobs`: MVP audit surface for ingest status and per-run summaries.
 
+Schema comments:
+
+- Every persisted PostgreSQL table and column must have a database-level comment, visible through DBeaver and `pg_catalog`.
+- PKCS schema comments are written in Chinese because the primary local database inspection workflow is Chinese-language review.
+- Add comments through Alembic migrations with `COMMENT ON TABLE ... IS ...` and `COMMENT ON COLUMN ... IS ...`.
+- When adding a table or column, update the schema comment migration path and `tests/test_database_schema.py` so missing comments fail tests.
+
 Read source:
 
 - The only MVP locator format is `line N-M`.
@@ -148,6 +155,7 @@ Transaction boundary:
 | Context Pack evidence selected | Each item maps back to `read_source(chunk_id=...)` | Context Pack tests compare evidence content with read_source |
 | Multiple adjacent chunks from one source | Per-source cap limits source dominance | Context Pack tests assert per-source cap |
 | Soft budget set | Markdown gets shorter but structured evidence remains traceable | Context Pack budget test |
+| Table or column exists in public schema | PostgreSQL comment is present and non-empty | Schema test queries `obj_description` and `col_description` |
 
 ### 5. Good/Base/Bad Cases
 
@@ -183,6 +191,7 @@ session.commit()
 ### 6. Tests Required
 
 - `tests/test_database_schema.py`: table presence, required indexes, generated `search_vector`.
+- `tests/test_database_schema.py`: table and column comments must be present for all PKCS public schema tables.
 - `tests/test_repositories.py`: repository write/read behavior and caller-owned commit.
 - `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
 - `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, and ingest job summaries.
@@ -245,6 +254,7 @@ Do not put evidence content into a Context Pack without refs that can be read ba
 
 - Treating `content_hash` as source identity. It is version identity; `canonical_key` is the stable source identity.
 - Adding a model field without adding an Alembic migration and a schema assertion.
+- Adding a table or column without a Chinese PostgreSQL comment; this makes DBeaver inspection ambiguous.
 - Committing inside repository methods, which makes multi-table ingest rollback unsafe.
 - Writing optional PostgreSQL filter clauses as `:source_type is null`; cast nullable params with `cast(:source_type as text)` so PostgreSQL can infer the type.
 - Reading current source files instead of Raw Archive in `read_source`; this breaks version traceability.
