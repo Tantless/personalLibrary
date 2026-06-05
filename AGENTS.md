@@ -65,16 +65,17 @@ Core stack:
 
 Core constraints:
 
-* Source types: `ai_conversation`, `markdown_doc`
+* Knowledge types: `document`, `ai_conversation`
+* Database source metadata uses int codes for `source_format_code`, `normalized_format_code`, and `knowledge_type_code`
 * Input: local file paths only; single file or non-recursive directory
 * AI conversation formats: Markdown/transcript and JSONL
 * Document formats: local `.md` and `.txt` only
 * Raw Archive: project-local `data/raw/`, gitignored
 * Search: PostgreSQL FTS with `simple`, database-generated `search_vector`, FTS GIN index, FTS rank + title boost
-* Filters: `source_type`, `canonical_key`, `top_k`
+* Filters: `knowledge_type`, `canonical_key`, `top_k`
 * Context Pack: JSON + Markdown, max 10 evidence, max 3 per source, soft `budget_tokens`, includes `Conflicts / Caveats`
 * Evidence must always map to `source_id`, `version_id`, and locator; `read_source` supports `chunk_id` and full source/version/locator addressing
-* Search: `SearchProvider` abstraction, PostgreSQL FTS provider, `search_knowledge`, title boost, `source_type`/`canonical_key`/`top_k` filters, stable evidence result shape
+* Search: `SearchProvider` abstraction, PostgreSQL FTS provider, `search_knowledge`, title boost, `knowledge_type`/`canonical_key`/`top_k` filters, stable evidence result shape with `source_format`, `normalized_format`, and `knowledge_type`
 * Read source: `ReadSourceService`, Raw Archive backed reads, `line N-M` locators, `chunk_id` and source/version/locator addressing, optional `context_lines`
 * Context Pack: `ContextPackService`, search + read_source orchestration, chunk deduplication, evidence caps, per-source cap, JSON + Markdown response, soft `budget_tokens`, Caveats
 
@@ -113,7 +114,7 @@ MVP is complete only when:
 ## PR7 Acceptance Shape
 
 * Fixture corpus lives under `tests/fixtures/markdown/` and `tests/fixtures/conversations/`.
-* `tests/fixtures/eval_queries.jsonl` contains at least 20 query expectations with `query`, `expected_fixture`, `expected_canonical_keys`, `expected_source_types`, and `notes`.
+* `tests/fixtures/eval_queries.jsonl` contains at least 20 query expectations with `query`, `expected_fixture`, `expected_canonical_keys`, `expected_knowledge_types`, and `notes`.
 * PR7 tests use runtime-unique canonical keys to avoid persistent Docker database collisions.
 * Generic MCP fallback proves `health_check -> ingest_source -> search_knowledge -> read_source -> get_context_pack`.
 

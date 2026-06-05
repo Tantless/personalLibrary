@@ -66,7 +66,7 @@ assert result.exit_code == 0
 - Full suite: `uv run pytest`.
 - For database PRs: PostgreSQL must be healthy and Alembic must be at head.
 - For PR3 ingest: tests must cover file ingest, directory ingest, duplicate skip, new version creation, parser metadata, CLI, and MCP.
-- For PR4 search: tests must cover result shape, `source_type` filter, `canonical_key` filter, `top_k`, title boost, no-results behavior, CLI, and MCP.
+- For PR4 search: tests must cover result shape, `knowledge_type` filter, `canonical_key` filter, `top_k`, title boost, no-results behavior, CLI, and MCP.
 - For PR5 reader: tests must cover `chunk_id`, source/version/locator addressing, `context_lines`, invalid locator/missing refs, CLI, and MCP.
 - For PR6 Context Pack: tests must cover outer JSON shape, evidence caps, per-source limit, `budget_tokens`, Caveats, `read_source` mapping, CLI, and MCP.
 - For PR7 acceptance: tests must ingest at least 10 Markdown/text fixtures and 10 AI conversation fixtures, validate `tests/fixtures/eval_queries.jsonl`, require top 10 >= 80% and top 5 >= 60%, cover CLI ingest/search/read/context-pack, and cover MCP health/ingest/search/read/context-pack via Codex or generic MCP client fallback.

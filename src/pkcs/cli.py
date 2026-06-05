@@ -23,13 +23,13 @@ def health() -> None:
 @app.command()
 def ingest(
     path: Path = typer.Argument(..., help="Local file or non-recursive directory to ingest."),
-    source_type: str = typer.Option("markdown_doc", "--source-type", help="markdown_doc or ai_conversation."),
+    knowledge_type: str = typer.Option("document", "--knowledge-type", help="document or ai_conversation."),
     canonical_key: str | None = typer.Option(None, "--canonical-key", help="Stable source key for single-file ingest."),
 ) -> None:
     """Ingest a local file or non-recursive directory."""
     report = IngestService.from_settings(get_settings()).ingest_source(
         path=path,
-        source_type=source_type,
+        knowledge_type=knowledge_type,
         canonical_key=canonical_key,
     )
     typer.echo(json.dumps(report.to_dict(), ensure_ascii=False))
@@ -38,14 +38,14 @@ def ingest(
 @app.command()
 def search(
     query: str = typer.Argument(..., help="Full-text search query."),
-    source_type: str | None = typer.Option(None, "--source-type", help="Optional source type filter."),
+    knowledge_type: str | None = typer.Option(None, "--knowledge-type", help="Optional knowledge type filter."),
     canonical_key: str | None = typer.Option(None, "--canonical-key", help="Optional canonical source key filter."),
     top_k: int | None = typer.Option(None, "--top-k", min=1, help="Maximum number of results."),
 ) -> None:
     """Search ingested knowledge with PostgreSQL full-text search."""
     response = SearchService.from_settings(get_settings()).search_knowledge(
         query=query,
-        source_type=source_type,
+        knowledge_type=knowledge_type,
         canonical_key=canonical_key,
         top_k=top_k,
     )
@@ -74,7 +74,7 @@ def read_source(
 @app.command("context-pack")
 def context_pack(
     query: str = typer.Argument(..., help="Query to build a Context Pack for."),
-    source_type: str | None = typer.Option(None, "--source-type", help="Optional source type filter."),
+    knowledge_type: str | None = typer.Option(None, "--knowledge-type", help="Optional knowledge type filter."),
     canonical_key: str | None = typer.Option(None, "--canonical-key", help="Optional canonical source key filter."),
     top_k: int | None = typer.Option(None, "--top-k", min=1, help="Search candidate count."),
     budget_tokens: int | None = typer.Option(None, "--budget-tokens", min=1, help="Soft Markdown budget hint."),
@@ -82,7 +82,7 @@ def context_pack(
     """Build Context Pack v0 as JSON plus Markdown."""
     response = ContextPackService.from_settings(get_settings()).get_context_pack(
         query=query,
-        source_type=source_type,
+        knowledge_type=knowledge_type,
         canonical_key=canonical_key,
         top_k=top_k,
         budget_tokens=budget_tokens,

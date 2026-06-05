@@ -4,7 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pkcs.ingest.models import ParsedChunk, ParsedSource, SOURCE_TYPE_AI_CONVERSATION, SOURCE_TYPE_MARKDOWN_DOC
+from pkcs.ingest.models import (
+    KNOWLEDGE_TYPE_NAME_AI_CONVERSATION,
+    KNOWLEDGE_TYPE_NAME_DOCUMENT,
+    ParsedChunk,
+    ParsedSource,
+)
 
 
 class IngestParseError(ValueError):
@@ -41,19 +46,19 @@ _SPEAKER_RE = re.compile(r"^([A-Za-z][A-Za-z0-9 _.-]{0,40}):\s*(.*)$")
 def parse_source_file(
     *,
     path: Path,
-    source_type: str,
+    knowledge_type: str,
     content_bytes: bytes,
     max_chars: int,
     overlap_lines: int,
 ) -> ParsedSource:
     text = _decode_utf8(content_bytes, path)
-    if source_type == SOURCE_TYPE_MARKDOWN_DOC:
-        return _parse_markdown_doc(path=path, text=text, max_chars=max_chars, overlap_lines=overlap_lines)
-    if source_type == SOURCE_TYPE_AI_CONVERSATION:
+    if knowledge_type == KNOWLEDGE_TYPE_NAME_DOCUMENT:
+        return _parse_document_source(path=path, text=text, max_chars=max_chars, overlap_lines=overlap_lines)
+    if knowledge_type == KNOWLEDGE_TYPE_NAME_AI_CONVERSATION:
         if path.suffix.lower() == ".jsonl":
             return _parse_ai_jsonl(path=path, text=text, max_chars=max_chars)
         return _parse_ai_transcript(path=path, text=text, max_chars=max_chars)
-    raise IngestParseError(f"unsupported source_type: {source_type}")
+    raise IngestParseError(f"unsupported knowledge_type: {knowledge_type}")
 
 
 def _decode_utf8(content_bytes: bytes, path: Path) -> str:
@@ -63,7 +68,7 @@ def _decode_utf8(content_bytes: bytes, path: Path) -> str:
         raise IngestParseError(f"{path} is not valid UTF-8 text") from exc
 
 
-def _parse_markdown_doc(*, path: Path, text: str, max_chars: int, overlap_lines: int) -> ParsedSource:
+def _parse_document_source(*, path: Path, text: str, max_chars: int, overlap_lines: int) -> ParsedSource:
     lines = text.splitlines()
     if not any(line.strip() for line in lines):
         raise IngestParseError("document is empty")
@@ -79,7 +84,7 @@ def _parse_markdown_doc(*, path: Path, text: str, max_chars: int, overlap_lines:
         chunks.extend(
             _chunks_from_section(
                 section=section,
-                source_type=SOURCE_TYPE_MARKDOWN_DOC,
+                knowledge_type=KNOWLEDGE_TYPE_NAME_DOCUMENT,
                 max_chars=max_chars,
                 overlap_lines=overlap_lines,
             )
@@ -90,7 +95,7 @@ def _parse_markdown_doc(*, path: Path, text: str, max_chars: int, overlap_lines:
 
     return ParsedSource(
         title=_safe_title(title),
-        source_type=SOURCE_TYPE_MARKDOWN_DOC,
+        knowledge_type=KNOWLEDGE_TYPE_NAME_DOCUMENT,
         metadata_json={
             "format": path.suffix.lower().lstrip(".") or "text",
             "line_count": len(lines),
@@ -149,7 +154,7 @@ def _markdown_sections(*, path: Path, lines: list[str]) -> tuple[str, list[_Sect
 def _chunks_from_section(
     *,
     section: _Section,
-    source_type: str,
+    knowledge_type: str,
     max_chars: int,
     overlap_lines: int,
 ) -> list[ParsedChunk]:
@@ -167,7 +172,7 @@ def _chunks_from_section(
                 line_end=line_end,
                 heading_path=section.heading_path,
                 metadata_json={
-                    "source_type": source_type,
+                    "knowledge_type": knowledge_type,
                     "heading_path": section.heading_path,
                 },
             )
@@ -325,7 +330,7 @@ def _conversation_source(
                 line_start=window.turns[0].line_start,
                 line_end=window.turns[-1].line_end,
                 metadata_json={
-                    "source_type": SOURCE_TYPE_AI_CONVERSATION,
+                    "knowledge_type": KNOWLEDGE_TYPE_NAME_AI_CONVERSATION,
                     "format": input_format,
                     "roles": roles,
                     "turn_start": window.turn_start,
@@ -337,7 +342,7 @@ def _conversation_source(
 
     return ParsedSource(
         title=title,
-        source_type=SOURCE_TYPE_AI_CONVERSATION,
+        knowledge_type=KNOWLEDGE_TYPE_NAME_AI_CONVERSATION,
         metadata_json={
             "format": input_format,
             "line_count": line_count,

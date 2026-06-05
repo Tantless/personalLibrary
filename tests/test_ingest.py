@@ -38,8 +38,8 @@ def test_ingest_markdown_file_creates_version_chunks_citations_and_archive(db_se
 
     report = service.ingest_source(
         path=source_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:test-{uuid4().hex}",
+        knowledge_type="document",
+        canonical_key=f"document:test-{uuid4().hex}",
     )
 
     assert report.status == "completed"
@@ -66,13 +66,13 @@ def test_ingest_markdown_file_creates_version_chunks_citations_and_archive(db_se
 def test_ingest_duplicate_hash_skips_and_new_hash_creates_new_version(db_session, tmp_path) -> None:
     source_path = tmp_path / "versioned.md"
     source_path.write_text("# Versioned\n\nOriginal body.\n", encoding="utf-8")
-    canonical_key = f"markdown_doc:versioned-{uuid4().hex}"
+    canonical_key = f"document:versioned-{uuid4().hex}"
     service = make_service(db_session, tmp_path / "raw")
 
-    first = service.ingest_source(path=source_path, source_type="markdown_doc", canonical_key=canonical_key)
-    duplicate = service.ingest_source(path=source_path, source_type="markdown_doc", canonical_key=canonical_key)
+    first = service.ingest_source(path=source_path, knowledge_type="document", canonical_key=canonical_key)
+    duplicate = service.ingest_source(path=source_path, knowledge_type="document", canonical_key=canonical_key)
     source_path.write_text("# Versioned\n\nChanged body.\n", encoding="utf-8")
-    changed = service.ingest_source(path=source_path, source_type="markdown_doc", canonical_key=canonical_key)
+    changed = service.ingest_source(path=source_path, knowledge_type="document", canonical_key=canonical_key)
 
     assert first.status == "completed"
     assert duplicate.status == "skipped"
@@ -98,7 +98,7 @@ def test_ingest_directory_is_non_recursive_and_continues_after_file_failure(db_s
     (nested / "nested.md").write_text("# Nested\n\nDo not ingest recursively.\n", encoding="utf-8")
     service = make_service(db_session, tmp_path / "raw")
 
-    report = service.ingest_source(path=root, source_type="markdown_doc")
+    report = service.ingest_source(path=root, knowledge_type="document")
 
     assert report.status == "completed_with_errors"
     assert len(report.succeeded) == 1
@@ -116,12 +116,12 @@ def test_ingest_ai_conversation_transcript_and_jsonl_metadata(db_session, tmp_pa
 
     transcript_report = service.ingest_source(
         path=transcript,
-        source_type="ai_conversation",
+        knowledge_type="ai_conversation",
         canonical_key=f"ai_conversation:transcript-{uuid4().hex}",
     )
     jsonl_report = service.ingest_source(
         path=jsonl,
-        source_type="ai_conversation",
+        knowledge_type="ai_conversation",
         canonical_key=f"ai_conversation:jsonl-{uuid4().hex}",
     )
 
@@ -152,10 +152,10 @@ def test_cli_ingest_command_outputs_report(monkeypatch, migrated_database_url, t
         [
             "ingest",
             str(source_path),
-            "--source-type",
-            "markdown_doc",
+            "--knowledge-type",
+            "document",
             "--canonical-key",
-            f"markdown_doc:cli-{uuid4().hex}",
+            f"document:cli-{uuid4().hex}",
         ],
     )
 
@@ -180,8 +180,8 @@ async def test_mcp_ingest_source_tool_smoke(monkeypatch, migrated_database_url, 
         "ingest_source",
         {
             "path": str(source_path),
-            "source_type": "markdown_doc",
-            "canonical_key": f"markdown_doc:mcp-{uuid4().hex}",
+            "knowledge_type": "document",
+            "canonical_key": f"document:mcp-{uuid4().hex}",
         },
     )
 

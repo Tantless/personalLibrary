@@ -42,7 +42,7 @@ def load_eval_queries() -> list[dict]:
         assert row["query"].strip(), f"missing query on eval line {line_number}"
         assert row["expected_fixture"].strip(), f"missing expected fixture on eval line {line_number}"
         assert row["expected_canonical_keys"], f"missing expected canonical keys on eval line {line_number}"
-        assert row["expected_source_types"], f"missing expected source types on eval line {line_number}"
+        assert row["expected_knowledge_types"], f"missing expected knowledge types on eval line {line_number}"
         rows.append(row)
     return rows
 
@@ -52,15 +52,15 @@ def parse_mcp_json(result) -> dict:
     return json.loads(content[0].text)
 
 
-def fixture_files(source_type: str) -> list[Path]:
-    if source_type == "markdown_doc":
+def fixture_files(knowledge_type: str) -> list[Path]:
+    if knowledge_type == "document":
         root = FIXTURES_ROOT / "markdown"
         patterns = ("*.md", "*.txt")
-    elif source_type == "ai_conversation":
+    elif knowledge_type == "ai_conversation":
         root = FIXTURES_ROOT / "conversations"
         patterns = ("*.md", "*.txt", "*.jsonl")
     else:
-        raise ValueError(f"unsupported source_type: {source_type}")
+        raise ValueError(f"unsupported knowledge_type: {knowledge_type}")
 
     files: list[Path] = []
     for pattern in patterns:
@@ -94,19 +94,19 @@ def copy_fixture_with_marker(source_path: Path, target_path: Path, marker: str) 
 
 
 def test_mvp_eval_fixture_corpus_and_queries_have_required_shape() -> None:
-    markdown_files = fixture_files("markdown_doc")
+    markdown_files = fixture_files("document")
     conversation_files = fixture_files("ai_conversation")
     eval_rows = load_eval_queries()
     fixture_relpaths = {
         file.relative_to(FIXTURES_ROOT).as_posix() for file in [*markdown_files, *conversation_files]
     }
-    source_type_counts = Counter(row["expected_source_types"][0] for row in eval_rows)
+    knowledge_type_counts = Counter(row["expected_knowledge_types"][0] for row in eval_rows)
 
     assert len(markdown_files) >= 10
     assert len(conversation_files) >= 10
     assert len(eval_rows) >= 20
-    assert source_type_counts["markdown_doc"] >= 10
-    assert source_type_counts["ai_conversation"] >= 10
+    assert knowledge_type_counts["document"] >= 10
+    assert knowledge_type_counts["ai_conversation"] >= 10
     assert {row["expected_fixture"] for row in eval_rows} <= fixture_relpaths
 
 
@@ -122,15 +122,15 @@ def test_mvp_eval_queries_meet_retrieval_thresholds(db_session, tmp_path) -> Non
         if fixture_relpath in ingested_by_fixture:
             continue
 
-        source_types = row["expected_source_types"]
-        assert len(source_types) == 1
+        knowledge_types = row["expected_knowledge_types"]
+        assert len(knowledge_types) == 1
         expected_key = row["expected_canonical_keys"][0].format(run_id=run_id)
         marker = f"evalmarker{run_id}{index}"
         marked_fixture_path = tmp_path / "eval_corpus" / fixture_relpath
         copy_fixture_with_marker(FIXTURES_ROOT / fixture_relpath, marked_fixture_path, marker)
         report = ingest.ingest_source(
             path=marked_fixture_path,
-            source_type=source_types[0],
+            knowledge_type=knowledge_types[0],
             canonical_key=expected_key,
         )
 
@@ -185,10 +185,10 @@ def test_final_acceptance_cli_ingest_search_read_context_pack_flow(monkeypatch, 
             [
                 "ingest",
                 str(source_path),
-                "--source-type",
-                "markdown_doc",
+                "--knowledge-type",
+                "document",
                 "--canonical-key",
-                f"markdown_doc:cli-acceptance-{token}",
+                f"document:cli-acceptance-{token}",
             ],
         )
         assert ingest_result.exit_code == 0
@@ -248,8 +248,8 @@ async def test_codex_first_mcp_acceptance_generic_client_fallback(
             "ingest_source",
             {
                 "path": str(source_path),
-                "source_type": "markdown_doc",
-                "canonical_key": f"markdown_doc:mcp-acceptance-{token}",
+                "knowledge_type": "document",
+                "canonical_key": f"document:mcp-acceptance-{token}",
             },
         )
         assert parse_mcp_json(ingest_result)["status"] == "completed"

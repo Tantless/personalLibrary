@@ -2,7 +2,7 @@
 
 User: How should filters work in search_knowledge?
 
-Assistant: The filteranchor check uses source_type, canonical_key, and top_k filters without changing ranking logic.
+Assistant: The filteranchor check uses knowledge_type, canonical_key, and top_k filters without changing ranking logic.
 
 User: Should ranking include embeddings?
 

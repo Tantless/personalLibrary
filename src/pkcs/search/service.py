@@ -1,7 +1,7 @@
 import logging
 
 from pkcs.config import Settings, get_settings
-from pkcs.ingest.models import SUPPORTED_SOURCE_TYPES
+from pkcs.ingest.models import SUPPORTED_KNOWLEDGE_TYPES
 from pkcs.search.models import SearchResponse
 from pkcs.search.providers import PostgresFTSSearchProvider, SearchProvider
 
@@ -29,15 +29,15 @@ class SearchService:
         self,
         *,
         query: str,
-        source_type: str | None = None,
+        knowledge_type: str | None = None,
         canonical_key: str | None = None,
         top_k: int | None = None,
     ) -> SearchResponse:
         normalized_query = query.strip()
         if not normalized_query:
             raise SearchInputError("query must not be empty")
-        if source_type is not None and source_type not in SUPPORTED_SOURCE_TYPES:
-            raise SearchInputError(f"unsupported source_type: {source_type}")
+        if knowledge_type is not None and knowledge_type not in SUPPORTED_KNOWLEDGE_TYPES:
+            raise SearchInputError(f"unsupported knowledge_type: {knowledge_type}")
 
         resolved_top_k = top_k or self.default_top_k
         if resolved_top_k < 1:
@@ -45,7 +45,7 @@ class SearchService:
 
         results = self.provider.search(
             query=normalized_query,
-            source_type=source_type,
+            knowledge_type=knowledge_type,
             canonical_key=canonical_key,
             top_k=resolved_top_k,
         )
@@ -53,14 +53,14 @@ class SearchService:
             "search_knowledge_completed",
             extra={
                 "event": "search_knowledge_completed",
-                "source_type": source_type,
+                "knowledge_type": knowledge_type,
                 "top_k": resolved_top_k,
                 "result_count": len(results),
             },
         )
         return SearchResponse(
             query=normalized_query,
-            source_type=source_type,
+            knowledge_type=knowledge_type,
             canonical_key=canonical_key,
             top_k=resolved_top_k,
             results=results,

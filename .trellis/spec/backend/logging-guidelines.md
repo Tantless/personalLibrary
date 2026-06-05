@@ -35,11 +35,11 @@ context_pack_completed
 ### 3. Contracts
 
 - Include `event` in `extra` for machine-readable logs.
-- Include stable references when available: `source_id`, `version_id`, `source_type`, `chunks_created`.
-- For failures, include path and source_type, but not content.
-- For search, include `source_type`, `top_k`, and `result_count`; do not log the full query text.
+- Include stable references when available: `source_id`, `version_id`, `knowledge_type`, `chunks_created`.
+- For failures, include path and knowledge_type, but not content.
+- For search, include `knowledge_type`, `top_k`, and `result_count`; do not log the full query text.
 - For `read_source`, include source/version/chunk refs and `context_lines`; do not log returned content.
-- For Context Pack, include `source_type`, `top_k`, and `evidence_count`; do not log the query, evidence content, or Markdown body.
+- For Context Pack, include `knowledge_type`, `top_k`, and `evidence_count`; do not log the query, evidence content, or Markdown body.
 - `ingest_jobs.summary_json` is the durable MVP audit surface; logs are operational traces.
 
 ### 4. Validation & Error Matrix
@@ -67,7 +67,7 @@ logger.info(
 
 logger.info(
     "search_knowledge_completed",
-    extra={"event": "search_knowledge_completed", "source_type": source_type, "top_k": top_k, "result_count": count},
+    extra={"event": "search_knowledge_completed", "knowledge_type": knowledge_type, "top_k": top_k, "result_count": count},
 )
 
 logger.info(
@@ -77,7 +77,7 @@ logger.info(
 
 logger.info(
     "context_pack_completed",
-    extra={"event": "context_pack_completed", "source_type": source_type, "top_k": top_k, "evidence_count": evidence_count},
+    extra={"event": "context_pack_completed", "knowledge_type": knowledge_type, "top_k": top_k, "evidence_count": evidence_count},
 )
 ```
 

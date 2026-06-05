@@ -50,7 +50,7 @@ class ContextPackService:
         self,
         *,
         query: str,
-        source_type: str | None = None,
+        knowledge_type: str | None = None,
         canonical_key: str | None = None,
         top_k: int | None = None,
         budget_tokens: int | None = None,
@@ -66,7 +66,7 @@ class ContextPackService:
         search_top_k = top_k or self.default_top_k
         search_response = self.search_service.search_knowledge(
             query=normalized_query,
-            source_type=source_type,
+            knowledge_type=knowledge_type,
             canonical_key=canonical_key,
             top_k=search_top_k,
         )
@@ -96,7 +96,7 @@ class ContextPackService:
             "context_pack_completed",
             extra={
                 "event": "context_pack_completed",
-                "source_type": source_type,
+                "knowledge_type": knowledge_type,
                 "top_k": search_top_k,
                 "evidence_count": len(evidence),
             },
@@ -139,7 +139,9 @@ class ContextPackService:
                     version_id=result.version_id,
                     canonical_key=result.canonical_key,
                     title=result.title,
-                    source_type=result.source_type,
+                    source_format=result.source_format,
+                    normalized_format=result.normalized_format,
+                    knowledge_type=result.knowledge_type,
                     locator=result.citation.locator,
                     line_start=result.citation.line_start,
                     line_end=result.citation.line_end,
@@ -165,7 +167,9 @@ class ContextPackService:
                     version_id=item.version_id,
                     canonical_key=item.canonical_key,
                     title=item.title,
-                    source_type=item.source_type,
+                    source_format=item.source_format,
+                    normalized_format=item.normalized_format,
+                    knowledge_type=item.knowledge_type,
                     evidence_count=source_counts[item.source_id],
                 )
             )
@@ -211,7 +215,7 @@ class ContextPackService:
         if sources:
             for source in sources:
                 sections.append(
-                    f"- {source.title} ({source.source_type}) - source_id={source.source_id}, "
+                    f"- {source.title} ({source.knowledge_type}) - source_id={source.source_id}, "
                     f"version_id={source.version_id}, evidence={source.evidence_count}"
                 )
         else:

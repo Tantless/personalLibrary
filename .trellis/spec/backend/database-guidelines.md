@@ -44,22 +44,22 @@ SourceRepository.get(source_id)
 SourceRepository.get_by_canonical_key(canonical_key)
 SourceRepository.get_version_by_hash(source_id, content_hash)
 SourceRepository.get_version(source_id, version_id)
-SourceRepository.create_source(canonical_key, title, source_type, origin_uri=None)
-SourceRepository.create_version(source, content_hash, file_path, raw_archive_path, version_id=None, status="imported", metadata_json=None)
-ChunkRepository.create_chunk(source_id, version_id, chunk_index, title, source_type, locator, line_start, line_end, content, ...)
+SourceRepository.create_source(canonical_key, title, knowledge_type_code, origin_uri=None)
+SourceRepository.create_version(source, content_hash, source_format_code, normalized_format_code, file_path, raw_archive_path, version_id=None, status="imported", metadata_json=None)
+ChunkRepository.create_chunk(source_id, version_id, chunk_index, title, source_format_code, normalized_format_code, knowledge_type_code, locator, line_start, line_end, content, ...)
 ChunkRepository.get(chunk_id)
 ChunkRepository.get_by_locator(source_id, version_id, locator)
 CitationRepository.create_citation(source_id, version_id, chunk_id, locator, line_start, line_end, quote=None, metadata_json=None)
-IngestJobRepository.create_job(source_type, input_path, status="started", summary_json=None)
+IngestJobRepository.create_job(knowledge_type_code, input_path, status="started", summary_json=None)
 IngestJobRepository.finish_job(job, status, summary_json, error_message=None)
 ```
 
 Search signatures:
 
 ```python
-SearchProvider.search(query, top_k, source_type=None, canonical_key=None)
+SearchProvider.search(query, top_k, knowledge_type=None, canonical_key=None)
 PostgresFTSSearchProvider.from_database_url(database_url)
-SearchService.search_knowledge(query, source_type=None, canonical_key=None, top_k=None)
+SearchService.search_knowledge(query, knowledge_type=None, canonical_key=None, top_k=None)
 ```
 
 Reader signatures:
@@ -73,16 +73,16 @@ ReadSourceService.read_source(chunk_id=None, source_id=None, version_id=None, lo
 Context Pack signatures:
 
 ```python
-ContextPackService.get_context_pack(query, source_type=None, canonical_key=None, top_k=None, budget_tokens=None)
+ContextPackService.get_context_pack(query, knowledge_type=None, canonical_key=None, top_k=None, budget_tokens=None)
 ```
 
 ### 3. Contracts
 
 Core tables:
 
-- `sources`: one stable source identity per `canonical_key`; `source_type` is indexed; `current_version_id` points at the latest imported version.
-- `source_versions`: immutable source versions; `(source_id, content_hash)` and `(source_id, version_number)` are unique; `raw_archive_path` must point to the archived raw file.
-- `chunks`: searchable evidence units; `(version_id, chunk_index)` is unique; locator fields use `locator`, `line_start`, and `line_end`.
+- `sources`: one stable source identity per `canonical_key`; `knowledge_type_code` is indexed; `current_version_id` points at the latest imported version.
+- `source_versions`: immutable source versions; stores `source_format_code` and `normalized_format_code`; `(source_id, content_hash)` and `(source_id, version_number)` are unique; `raw_archive_path` must point to the archived raw file.
+- `chunks`: searchable evidence units; stores denormalized `source_format_code`, `normalized_format_code`, and `knowledge_type_code`; `(version_id, chunk_index)` is unique; locator fields use `locator`, `line_start`, and `line_end`.
 - `citations`: source/version/chunk-linked evidence references for future `read_source` and Context Pack output.
 - `ingest_jobs`: MVP audit surface for ingest status and per-run summaries.
 
@@ -95,6 +95,8 @@ Schema comments:
 - Keep comments short enough for database UI inspection; avoid paragraph-length explanations in column comments.
 - Add comments through Alembic migrations with `COMMENT ON TABLE ... IS ...` and `COMMENT ON COLUMN ... IS ...`.
 - When adding a table or column, update the schema comment migration path and `tests/test_database_schema.py` so missing comments fail tests.
+- Persisted enum fields use integer code columns. Column comments must list each int mapping, for example `1:md，2:txt`.
+- Do not put original file format and knowledge semantics into one database field. Source format, normalized format, and knowledge type are separate concepts.
 
 Read source:
 
@@ -118,7 +120,7 @@ Full-text search:
 - Application code must not write `search_vector`.
 - PostgreSQL FTS search must read `chunks.search_vector` and use `websearch_to_tsquery('simple', query)`.
 - Search ranking is `ts_rank_cd(chunks.search_vector, query)` plus an explicit title match boost.
-- Optional `source_type` and `canonical_key` filters must be SQL parameters and cast nullable params to text.
+- Optional `knowledge_type` and `canonical_key` filters must be SQL parameters. Cast nullable integer params to integer and nullable text params to text.
 - The expression uses PostgreSQL `simple` configuration and title boost:
 
 ```sql
@@ -129,7 +131,7 @@ setweight(to_tsvector('simple', coalesce(content, '')), 'B')
 Indexes:
 
 - `ix_chunks_search_vector` must be a GIN index.
-- Keep indexes for `source_type`, `source_id`, `version_id`, `content_hash`, and ingest `status` when changing schema.
+- Keep indexes for `knowledge_type_code`, `source_format_code`, `source_id`, `version_id`, `content_hash`, and ingest `status` when changing schema.
 
 Transaction boundary:
 
@@ -167,15 +169,17 @@ Good:
 
 ```python
 source = SourceRepository(session).create_source(
-    canonical_key="markdown_doc:C:/notes/example.md",
+    canonical_key="document:C:/notes/example.md",
     title="example.md",
-    source_type="markdown_doc",
+    knowledge_type_code=1,
 )
 version = SourceRepository(session).create_version(
     source=source,
     content_hash="sha256hex",
+    source_format_code=1,
+    normalized_format_code=1,
     file_path="C:/notes/example.md",
-    raw_archive_path="data/raw/markdown_doc/source/version/example.md",
+    raw_archive_path="data/raw/document/source/version/example.md",
 )
 session.commit()
 ```
@@ -263,6 +267,6 @@ Do not put evidence content into a Context Pack without refs that can be read ba
 - Writing paragraph-length schema comments; DBeaver comments should stay scannable as `<中文名>：<解释>`.
 - Writing a foreign key comment without the referenced table and column; DBeaver users need the relationship without opening constraints.
 - Committing inside repository methods, which makes multi-table ingest rollback unsafe.
-- Writing optional PostgreSQL filter clauses as `:source_type is null`; cast nullable params with `cast(:source_type as text)` so PostgreSQL can infer the type.
+- Writing optional PostgreSQL filter clauses as `:knowledge_type_code is null`; cast nullable params with `cast(:knowledge_type_code as integer)` so PostgreSQL can infer the type.
 - Reading current source files instead of Raw Archive in `read_source`; this breaks version traceability.
 - Building Context Pack evidence directly from snippets only; snippets are not enough for read-back traceability.

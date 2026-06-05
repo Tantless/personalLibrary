@@ -11,6 +11,7 @@ from pkcs.db.repositories import ChunkRepository, SourceRepository
 from pkcs.db.session import create_session_factory
 from pkcs.reader.locators import LocatorError, format_line_locator, parse_line_locator
 from pkcs.reader.models import SourceFragment, SourceReference
+from pkcs.source_metadata import knowledge_type_name, normalized_format_name, source_format_name
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
@@ -81,7 +82,15 @@ class ReadSourceService:
                 chunk_id=chunk.id if chunk is not None else None,
                 canonical_key=source.canonical_key,
                 title=source.title,
-                source_type=source.source_type,
+                source_format=source_format_name(
+                    chunk.source_format_code if chunk is not None else version.source_format_code
+                ),
+                normalized_format=normalized_format_name(
+                    chunk.normalized_format_code if chunk is not None else version.normalized_format_code
+                ),
+                knowledge_type=knowledge_type_name(
+                    chunk.knowledge_type_code if chunk is not None else source.knowledge_type_code
+                ),
             ),
             locator=normalized_locator,
             line_start=line_start,

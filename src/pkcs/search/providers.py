@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from pkcs.db.session import create_session_factory
 from pkcs.search.models import SearchCitation, SearchResult
+from pkcs.source_metadata import knowledge_type_code_for_name, knowledge_type_name, normalized_format_name, source_format_name
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
 
@@ -17,7 +18,7 @@ class SearchProvider(Protocol):
         *,
         query: str,
         top_k: int,
-        source_type: str | None = None,
+        knowledge_type: str | None = None,
         canonical_key: str | None = None,
     ) -> list[SearchResult]:
         pass
@@ -36,9 +37,10 @@ class PostgresFTSSearchProvider:
         *,
         query: str,
         top_k: int,
-        source_type: str | None = None,
+        knowledge_type: str | None = None,
         canonical_key: str | None = None,
     ) -> list[SearchResult]:
+        knowledge_type_code = knowledge_type_code_for_name(knowledge_type) if knowledge_type is not None else None
         sql = text(
             """
             with search_query as (
@@ -50,7 +52,9 @@ class PostgresFTSSearchProvider:
                 c.version_id as version_id,
                 s.canonical_key as canonical_key,
                 c.title as title,
-                c.source_type as source_type,
+                c.source_format_code as source_format_code,
+                c.normalized_format_code as normalized_format_code,
+                c.knowledge_type_code as knowledge_type_code,
                 ts_headline(
                     'simple',
                     c.content,
@@ -74,7 +78,7 @@ class PostgresFTSSearchProvider:
             join sources s on s.id = c.source_id
             cross join search_query
             where c.search_vector @@ search_query.ts_query
-              and (cast(:source_type as text) is null or c.source_type = cast(:source_type as text))
+              and (cast(:knowledge_type_code as integer) is null or c.knowledge_type_code = cast(:knowledge_type_code as integer))
               and (cast(:canonical_key as text) is null or s.canonical_key = cast(:canonical_key as text))
             order by score desc, c.created_at asc, c.id asc
             limit :top_k
@@ -83,7 +87,7 @@ class PostgresFTSSearchProvider:
         params = {
             "query": query,
             "top_k": top_k,
-            "source_type": source_type,
+            "knowledge_type_code": knowledge_type_code,
             "canonical_key": canonical_key,
         }
         with self.session_factory() as session:
@@ -101,7 +105,9 @@ class PostgresFTSSearchProvider:
                     version_id=row["version_id"],
                     canonical_key=row["canonical_key"],
                     title=row["title"],
-                    source_type=row["source_type"],
+                    source_format=source_format_name(row["source_format_code"]),
+                    normalized_format=normalized_format_name(row["normalized_format_code"]),
+                    knowledge_type=knowledge_type_name(row["knowledge_type_code"]),
                     snippet=row["snippet"] or "",
                     score=float(row["score"] or 0),
                     citation=SearchCitation(

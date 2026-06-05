@@ -7,4 +7,4 @@ Content hash determines duplicate detection and whether a new source version is 
 
 ## Path Fallback
 
-When canonical_key is absent, the fallback uses source_type plus normalized absolute path.
+When canonical_key is absent, the fallback uses knowledge_type plus normalized absolute path.

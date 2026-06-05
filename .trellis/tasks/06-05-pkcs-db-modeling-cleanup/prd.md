@@ -40,12 +40,12 @@
 
 ## Acceptance Criteria
 
-* [ ] 数据库 schema 不再用单一 `source_type` 同时表达文件格式与内容语义。
-* [ ] 所有枚举字段以 int 存储，相关列注释说明每个 int 的含义。
-* [ ] CLI/MCP/HTTP 输入输出字段命名清晰，不再出现 `markdown_doc` 与 `ai_conversation` 作为同一维度的混合概念。
-* [ ] Ingest、search、read_source、context_pack 流程仍通过测试。
-* [ ] `canonical_key` fallback 策略同步调整，避免继续依赖旧 `source_type`。
-* [ ] README 和任务文档解释新字段含义、枚举映射和当前 MVP 支持范围。
+* [x] 数据库 schema 不再用单一 `source_type` 同时表达文件格式与内容语义。
+* [x] 所有枚举字段以 int 存储，相关列注释说明每个 int 的含义。
+* [x] CLI/MCP/HTTP 输入输出字段命名清晰，不再出现 `markdown_doc` 与 `ai_conversation` 作为同一维度的混合概念。
+* [x] Ingest、search、read_source、context_pack 流程仍通过测试。
+* [x] `canonical_key` fallback 策略同步调整，避免继续依赖旧 `source_type`。
+* [x] README 和任务文档解释新字段含义、枚举映射和当前 MVP 支持范围。
 
 ## Definition of Done
 
@@ -88,3 +88,20 @@ Candidate fields:
 **Decision**: First implement the minimal clean model: split file format, normalized format, and knowledge type; keep MVP `knowledge_type_code` to `1:document` and `2:ai_conversation`. After this works and tests pass, start the richer preset category phase by defining additional reserved values, but do not implement complex classification yet.
 
 **Consequences**: The first migration stays focused and fixes the modeling error without over-classifying personal knowledge. Future categories have a planned place, but they should be added only when ingest/search behavior actually needs them.
+
+## Implementation Result
+
+Completed on 2026-06-05.
+
+* Added `source_format_code`, `normalized_format_code`, and `knowledge_type_code` database modeling.
+* Replaced public `source_type` CLI/MCP/service contract with `knowledge_type`.
+* Search/read/context-pack outputs now expose `source_format`, `normalized_format`, and `knowledge_type` strings while the database stores int codes.
+* Raw Archive now writes under `knowledge_type/source_id/version_id`.
+* Updated README, backend specs, AGENTS, tests, and MVP PRD references.
+
+Verification:
+
+* `docker compose ps postgres`
+* `uv run alembic upgrade head`
+* `uv run pytest`
+* `git diff --check`

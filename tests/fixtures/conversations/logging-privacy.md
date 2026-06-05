@@ -6,4 +6,4 @@ Assistant: The loganchor rule avoids logging full source content, raw queries, g
 
 User: What should logs include?
 
-Assistant: Include event names, source type, ids, counts, and operation status.
+Assistant: Include event names, knowledge type, ids, counts, and operation status.

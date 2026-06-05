@@ -10,7 +10,9 @@ class ContextPackEvidence:
     version_id: str
     canonical_key: str
     title: str
-    source_type: str
+    source_format: str
+    normalized_format: str
+    knowledge_type: str
     locator: str
     line_start: int
     line_end: int
@@ -29,7 +31,9 @@ class ContextPackSource:
     version_id: str
     canonical_key: str
     title: str
-    source_type: str
+    source_format: str
+    normalized_format: str
+    knowledge_type: str
     evidence_count: int
 
     def to_dict(self) -> dict[str, Any]:

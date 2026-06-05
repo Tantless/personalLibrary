@@ -56,8 +56,8 @@ def test_read_source_by_chunk_id_maps_from_search_result(db_session, tmp_path) -
     ingest = make_ingest_service(db_session, tmp_path / "raw")
     ingest.ingest_source(
         path=source_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:reader-{token}",
+        knowledge_type="document",
+        canonical_key=f"document:reader-{token}",
     )
     result = make_search_service(db_session).search_knowledge(query=token, top_k=1).results[0]
 
@@ -78,8 +78,8 @@ def test_read_source_by_source_version_locator_with_context_lines(db_session, tm
     write_reader_fixture(source_path, token)
     report = make_ingest_service(db_session, tmp_path / "raw").ingest_source(
         path=source_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:locator-{token}",
+        knowledge_type="document",
+        canonical_key=f"document:locator-{token}",
     )
 
     fragment = make_reader_service(db_session).read_source(
@@ -108,8 +108,8 @@ def test_read_source_invalid_locator_and_missing_chunk_errors(db_session, tmp_pa
     write_reader_fixture(source_path, token)
     report = make_ingest_service(db_session, tmp_path / "raw").ingest_source(
         path=source_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:invalid-{token}",
+        knowledge_type="document",
+        canonical_key=f"document:invalid-{token}",
     )
     reader = make_reader_service(db_session)
 
@@ -136,10 +136,10 @@ def test_cli_read_command_outputs_fragment(monkeypatch, migrated_database_url, t
         [
             "ingest",
             str(source_path),
-            "--source-type",
-            "markdown_doc",
+            "--knowledge-type",
+            "document",
             "--canonical-key",
-            f"markdown_doc:cli-read-{token}",
+            f"document:cli-read-{token}",
         ],
     )
     search_result = runner.invoke(cli_app, ["search", token, "--top-k", "1"])
@@ -169,8 +169,8 @@ async def test_mcp_read_source_tool_smoke(monkeypatch, migrated_database_url, tm
         "ingest_source",
         {
             "path": str(source_path),
-            "source_type": "markdown_doc",
-            "canonical_key": f"markdown_doc:mcp-read-{token}",
+            "knowledge_type": "document",
+            "canonical_key": f"document:mcp-read-{token}",
         },
     )
     search_result = await server.call_tool("search_knowledge", {"query": token, "top_k": 1})

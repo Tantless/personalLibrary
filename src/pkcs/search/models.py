@@ -20,7 +20,9 @@ class SearchResult:
     version_id: str
     canonical_key: str
     title: str
-    source_type: str
+    source_format: str
+    normalized_format: str
+    knowledge_type: str
     snippet: str
     score: float
     citation: SearchCitation
@@ -34,7 +36,9 @@ class SearchResult:
             "version_id": self.version_id,
             "canonical_key": self.canonical_key,
             "title": self.title,
-            "source_type": self.source_type,
+            "source_format": self.source_format,
+            "normalized_format": self.normalized_format,
+            "knowledge_type": self.knowledge_type,
             "snippet": self.snippet,
             "score": self.score,
             "citation": self.citation.to_dict(),
@@ -45,7 +49,7 @@ class SearchResult:
 @dataclass(frozen=True)
 class SearchResponse:
     query: str
-    source_type: str | None
+    knowledge_type: str | None
     canonical_key: str | None
     top_k: int
     results: list[SearchResult]
@@ -53,7 +57,7 @@ class SearchResponse:
     def to_dict(self) -> dict[str, Any]:
         return {
             "query": self.query,
-            "source_type": self.source_type,
+            "knowledge_type": self.knowledge_type,
             "canonical_key": self.canonical_key,
             "top_k": self.top_k,
             "results": [result.to_dict() for result in self.results],

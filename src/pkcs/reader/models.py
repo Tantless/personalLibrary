@@ -9,7 +9,9 @@ class SourceReference:
     chunk_id: str | None
     canonical_key: str
     title: str
-    source_type: str
+    source_format: str
+    normalized_format: str
+    knowledge_type: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

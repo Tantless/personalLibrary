@@ -18,11 +18,11 @@ def create_mcp_server() -> FastMCP:
         return get_health_status(settings).__dict__
 
     @server.tool()
-    def ingest_source(path: str, source_type: str = "markdown_doc", canonical_key: str | None = None) -> dict:
+    def ingest_source(path: str, knowledge_type: str = "document", canonical_key: str | None = None) -> dict:
         """Ingest a local file or non-recursive directory."""
         report = IngestService.from_settings(settings).ingest_source(
             path=path,
-            source_type=source_type,
+            knowledge_type=knowledge_type,
             canonical_key=canonical_key,
         )
         return report.to_dict()
@@ -30,14 +30,14 @@ def create_mcp_server() -> FastMCP:
     @server.tool()
     def search_knowledge(
         query: str,
-        source_type: str | None = None,
+        knowledge_type: str | None = None,
         canonical_key: str | None = None,
         top_k: int | None = None,
     ) -> dict:
         """Search ingested knowledge with PostgreSQL full-text search."""
         response = SearchService.from_settings(settings).search_knowledge(
             query=query,
-            source_type=source_type,
+            knowledge_type=knowledge_type,
             canonical_key=canonical_key,
             top_k=top_k,
         )
@@ -64,7 +64,7 @@ def create_mcp_server() -> FastMCP:
     @server.tool()
     def get_context_pack(
         query: str,
-        source_type: str | None = None,
+        knowledge_type: str | None = None,
         canonical_key: str | None = None,
         top_k: int | None = None,
         budget_tokens: int | None = None,
@@ -72,7 +72,7 @@ def create_mcp_server() -> FastMCP:
         """Build Context Pack v0 as JSON plus Markdown."""
         response = ContextPackService.from_settings(settings).get_context_pack(
             query=query,
-            source_type=source_type,
+            knowledge_type=knowledge_type,
             canonical_key=canonical_key,
             top_k=top_k,
             budget_tokens=budget_tokens,

@@ -13,12 +13,21 @@ from pkcs.db.repositories import ChunkRepository, CitationRepository, IngestJobR
 from pkcs.db.session import create_session_factory
 from pkcs.ingest.models import (
     SUPPORTED_EXTENSIONS,
-    SUPPORTED_SOURCE_TYPES,
+    SUPPORTED_KNOWLEDGE_TYPES,
     IngestItemReport,
     IngestReport,
     canonical_key_for_path,
 )
 from pkcs.ingest.parsers import IngestParseError, parse_source_file
+from pkcs.source_metadata import (
+    knowledge_type_code_for_name,
+    knowledge_type_name,
+    normalized_format_code_for_source_format,
+    normalized_format_name,
+    source_format_code_for_path,
+    source_format_name,
+    validate_source_format_for_knowledge_type,
+)
 from pkcs.storage.raw_archive import RawArchiveWriter
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
@@ -58,22 +67,22 @@ class IngestService:
         self,
         *,
         path: Path | str,
-        source_type: str,
+        knowledge_type: str,
         canonical_key: str | None = None,
     ) -> IngestReport:
         self._reject_url(str(path))
         input_path = Path(path)
-        self._validate_source_type(source_type)
+        knowledge_type_code = self._validate_knowledge_type(knowledge_type)
 
         with self.session_factory() as session:
             job = IngestJobRepository(session).create_job(
-                source_type=source_type,
+                knowledge_type_code=knowledge_type_code,
                 input_path=str(input_path),
             )
             session.commit()
 
             try:
-                files, skipped = self._resolve_input_files(input_path, source_type, canonical_key)
+                files, skipped = self._resolve_input_files(input_path, knowledge_type, canonical_key)
             except Exception as exc:
                 failed_item = IngestItemReport(input_path=str(input_path), status="failed", error=str(exc))
                 report = self._build_report(
@@ -94,7 +103,8 @@ class IngestService:
                     item = self._ingest_file(
                         session=session,
                         path=file_path,
-                        source_type=source_type,
+                        knowledge_type=knowledge_type,
+                        knowledge_type_code=knowledge_type_code,
                         canonical_key=canonical_key,
                     )
                     session.commit()
@@ -104,7 +114,7 @@ class IngestService:
                     failed.append(item)
                     logger.exception(
                         "ingest_file_failed",
-                        extra={"event": "ingest_file_failed", "path": str(file_path), "source_type": source_type},
+                        extra={"event": "ingest_file_failed", "path": str(file_path), "knowledge_type": knowledge_type},
                     )
                     continue
 
@@ -116,7 +126,7 @@ class IngestService:
                             "event": "ingest_file_succeeded",
                             "source_id": item.source_id,
                             "version_id": item.version_id,
-                            "source_type": source_type,
+                            "knowledge_type": knowledge_type,
                             "chunks_created": item.chunks_created,
                         },
                     )
@@ -128,7 +138,7 @@ class IngestService:
                             "event": "ingest_file_skipped",
                             "source_id": item.source_id,
                             "version_id": item.version_id,
-                            "source_type": source_type,
+                            "knowledge_type": knowledge_type,
                             "reason": item.error,
                         },
                     )
@@ -154,18 +164,25 @@ class IngestService:
         *,
         session: Session,
         path: Path,
-        source_type: str,
+        knowledge_type: str,
+        knowledge_type_code: int,
         canonical_key: str | None,
     ) -> IngestItemReport:
-        self._validate_file_extension(path, source_type)
+        source_format_code = self._validate_file_extension(path, knowledge_type, knowledge_type_code)
+        normalized_format_code = normalized_format_code_for_source_format(source_format_code)
         resolved_path = path.resolve()
         content_bytes = resolved_path.read_bytes()
         content_hash = hashlib.sha256(content_bytes).hexdigest()
-        resolved_canonical_key = canonical_key or canonical_key_for_path(source_type, resolved_path)
+        resolved_canonical_key = canonical_key or canonical_key_for_path(knowledge_type, resolved_path)
 
         source_repo = SourceRepository(session)
         existing_source = source_repo.get_by_canonical_key(resolved_canonical_key)
         if existing_source is not None:
+            if existing_source.knowledge_type_code != knowledge_type_code:
+                existing_knowledge_type = knowledge_type_name(existing_source.knowledge_type_code)
+                raise IngestInputError(
+                    f"canonical source knowledge_type mismatch: {existing_knowledge_type} != {knowledge_type}"
+                )
             existing_version = source_repo.get_version_by_hash(
                 source_id=existing_source.id,
                 content_hash=content_hash,
@@ -183,7 +200,7 @@ class IngestService:
 
         parsed = parse_source_file(
             path=resolved_path,
-            source_type=source_type,
+            knowledge_type=knowledge_type,
             content_bytes=content_bytes,
             max_chars=self.chunk_max_chars,
             overlap_lines=self.chunk_overlap_lines,
@@ -193,13 +210,13 @@ class IngestService:
         source = existing_source or source_repo.create_source(
             canonical_key=resolved_canonical_key,
             title=parsed.title,
-            source_type=source_type,
+            knowledge_type_code=knowledge_type_code,
             origin_uri=resolved_path.as_posix(),
         )
 
         version_id = new_id()
         raw_archive_path = self.raw_archive_writer.write_bytes(
-            source_type=source_type,
+            knowledge_type=knowledge_type,
             source_id=source.id,
             version_id=version_id,
             original_path=resolved_path,
@@ -209,12 +226,17 @@ class IngestService:
             source=source,
             version_id=version_id,
             content_hash=content_hash,
+            source_format_code=source_format_code,
+            normalized_format_code=normalized_format_code,
             file_path=resolved_path.as_posix(),
             raw_archive_path=raw_archive_path.as_posix(),
             metadata_json={
                 **parsed.metadata_json,
                 "canonical_key": resolved_canonical_key,
                 "original_filename": resolved_path.name,
+                "source_format": source_format_name(source_format_code),
+                "normalized_format": normalized_format_name(normalized_format_code),
+                "knowledge_type": knowledge_type,
             },
         )
 
@@ -226,7 +248,9 @@ class IngestService:
                 version_id=version.id,
                 chunk_index=index,
                 title=parsed_chunk.title,
-                source_type=source_type,
+                source_format_code=source_format_code,
+                normalized_format_code=normalized_format_code,
+                knowledge_type_code=knowledge_type_code,
                 locator=parsed_chunk.locator,
                 line_start=parsed_chunk.line_start,
                 line_end=parsed_chunk.line_end,
@@ -260,7 +284,7 @@ class IngestService:
     def _resolve_input_files(
         self,
         input_path: Path,
-        source_type: str,
+        knowledge_type: str,
         canonical_key: str | None,
     ) -> tuple[list[Path], list[IngestItemReport]]:
         if input_path.is_file():
@@ -280,14 +304,14 @@ class IngestService:
                         )
                     )
                     continue
-                if child.is_file() and child.suffix.lower() in SUPPORTED_EXTENSIONS[source_type]:
+                if child.is_file() and child.suffix.lower() in SUPPORTED_EXTENSIONS[knowledge_type]:
                     files.append(child)
                 elif child.is_file():
                     skipped.append(
                         IngestItemReport(
                             input_path=str(child),
                             status="skipped",
-                            error=f"unsupported extension for {source_type}: {child.suffix.lower()}",
+                            error=f"unsupported extension for {knowledge_type}: {child.suffix.lower()}",
                         )
                     )
             return files, skipped
@@ -353,14 +377,24 @@ class IngestService:
             return "skipped"
         return "completed"
 
-    def _validate_source_type(self, source_type: str) -> None:
-        if source_type not in SUPPORTED_SOURCE_TYPES:
-            raise IngestInputError(f"unsupported source_type: {source_type}")
+    def _validate_knowledge_type(self, knowledge_type: str) -> int:
+        if knowledge_type not in SUPPORTED_KNOWLEDGE_TYPES:
+            raise IngestInputError(f"unsupported knowledge_type: {knowledge_type}")
+        try:
+            return knowledge_type_code_for_name(knowledge_type)
+        except ValueError as exc:
+            raise IngestInputError(str(exc)) from exc
 
-    def _validate_file_extension(self, path: Path, source_type: str) -> None:
-        suffix = path.suffix.lower()
-        if suffix not in SUPPORTED_EXTENSIONS[source_type]:
-            raise IngestInputError(f"unsupported extension for {source_type}: {suffix}")
+    def _validate_file_extension(self, path: Path, knowledge_type: str, knowledge_type_code: int) -> int:
+        try:
+            source_format_code = source_format_code_for_path(path)
+            validate_source_format_for_knowledge_type(
+                source_format_code=source_format_code,
+                knowledge_type_code=knowledge_type_code,
+            )
+        except ValueError as exc:
+            raise IngestInputError(str(exc)) from exc
+        return source_format_code
 
     def _reject_url(self, raw_path: str) -> None:
         if "://" in raw_path:

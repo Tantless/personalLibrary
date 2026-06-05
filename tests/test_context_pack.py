@@ -70,13 +70,13 @@ def test_context_pack_caps_per_source_and_maps_evidence_to_read_source(db_sessio
     ingest = make_ingest_service(db_session, tmp_path / "raw")
     first_report = ingest.ingest_source(
         path=first_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:first-{token}",
+        knowledge_type="document",
+        canonical_key=f"document:first-{token}",
     )
     second_report = ingest.ingest_source(
         path=second_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:second-{token}",
+        knowledge_type="document",
+        canonical_key=f"document:second-{token}",
     )
     service = make_context_service(db_session, max_evidence=5, max_evidence_per_source=2)
 
@@ -119,8 +119,8 @@ def test_context_pack_budget_tokens_softly_reduces_markdown(db_session, tmp_path
     write_multi_chunk_doc(source_path, token, 5)
     make_ingest_service(db_session, tmp_path / "raw").ingest_source(
         path=source_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:budget-{token}",
+        knowledge_type="document",
+        canonical_key=f"document:budget-{token}",
     )
     service = make_context_service(db_session, max_evidence=5, max_evidence_per_source=5)
 
@@ -158,10 +158,10 @@ def test_cli_context_pack_command_outputs_response(monkeypatch, migrated_databas
         [
             "ingest",
             str(source_path),
-            "--source-type",
-            "markdown_doc",
+            "--knowledge-type",
+            "document",
             "--canonical-key",
-            f"markdown_doc:cli-context-{token}",
+            f"document:cli-context-{token}",
         ],
     )
 
@@ -191,8 +191,8 @@ async def test_mcp_get_context_pack_tool_smoke(monkeypatch, migrated_database_ur
         "ingest_source",
         {
             "path": str(source_path),
-            "source_type": "markdown_doc",
-            "canonical_key": f"markdown_doc:mcp-context-{token}",
+            "knowledge_type": "document",
+            "canonical_key": f"document:mcp-context-{token}",
         },
     )
     result = await server.call_tool("get_context_pack", {"query": token, "top_k": 5, "budget_tokens": 300})

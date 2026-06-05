@@ -1,15 +1,27 @@
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
 from typing import Any, Literal
 
+from pkcs.source_metadata import (
+    KNOWLEDGE_TYPE_AI_CONVERSATION,
+    KNOWLEDGE_TYPE_DOCUMENT,
+    SOURCE_FORMAT_CODES_BY_EXTENSION,
+    SUPPORTED_SOURCE_FORMAT_CODES_BY_KNOWLEDGE_TYPE,
+    canonical_key_for_path,
+    knowledge_type_name,
+    source_format_name,
+)
 
-SOURCE_TYPE_AI_CONVERSATION = "ai_conversation"
-SOURCE_TYPE_MARKDOWN_DOC = "markdown_doc"
-SUPPORTED_SOURCE_TYPES = {SOURCE_TYPE_AI_CONVERSATION, SOURCE_TYPE_MARKDOWN_DOC}
+KNOWLEDGE_TYPE_NAME_AI_CONVERSATION = knowledge_type_name(KNOWLEDGE_TYPE_AI_CONVERSATION)
+KNOWLEDGE_TYPE_NAME_DOCUMENT = knowledge_type_name(KNOWLEDGE_TYPE_DOCUMENT)
+SUPPORTED_KNOWLEDGE_TYPES = {KNOWLEDGE_TYPE_NAME_AI_CONVERSATION, KNOWLEDGE_TYPE_NAME_DOCUMENT}
 
 SUPPORTED_EXTENSIONS = {
-    SOURCE_TYPE_AI_CONVERSATION: {".jsonl", ".md", ".txt"},
-    SOURCE_TYPE_MARKDOWN_DOC: {".md", ".txt"},
+    knowledge_type_name(knowledge_type_code): {
+        extension
+        for extension, source_format_code in SOURCE_FORMAT_CODES_BY_EXTENSION.items()
+        if source_format_code in source_format_codes
+    }
+    for knowledge_type_code, source_format_codes in SUPPORTED_SOURCE_FORMAT_CODES_BY_KNOWLEDGE_TYPE.items()
 }
 
 ItemStatus = Literal["succeeded", "skipped", "failed"]
@@ -32,7 +44,7 @@ class ParsedChunk:
 @dataclass(frozen=True)
 class ParsedSource:
     title: str
-    source_type: str
+    knowledge_type: str
     metadata_json: dict[str, Any]
     chunks: list[ParsedChunk]
 
@@ -86,5 +98,15 @@ class IngestReport:
         }
 
 
-def canonical_key_for_path(source_type: str, path: Path) -> str:
-    return f"{source_type}:{path.resolve().as_posix()}"
+__all__ = [
+    "KNOWLEDGE_TYPE_NAME_AI_CONVERSATION",
+    "KNOWLEDGE_TYPE_NAME_DOCUMENT",
+    "SUPPORTED_EXTENSIONS",
+    "SUPPORTED_KNOWLEDGE_TYPES",
+    "IngestItemReport",
+    "IngestReport",
+    "ParsedChunk",
+    "ParsedSource",
+    "canonical_key_for_path",
+    "source_format_name",
+]

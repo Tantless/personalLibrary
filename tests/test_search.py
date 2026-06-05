@@ -43,23 +43,23 @@ def test_search_knowledge_returns_stable_result_shape_and_filters(db_session, tm
         f'{{"conversation_title":"Traceable Chat","role":"assistant","content":"Return stable citations for {suffix}."}}\n',
         encoding="utf-8",
     )
-    markdown_key = f"markdown_doc:traceable-{suffix}"
+    markdown_key = f"document:traceable-{suffix}"
     conversation_key = f"ai_conversation:traceable-{suffix}"
     ingest = make_ingest_service(db_session, tmp_path / "raw")
     markdown_report = ingest.ingest_source(
         path=markdown_path,
-        source_type="markdown_doc",
+        knowledge_type="document",
         canonical_key=markdown_key,
     )
     conversation_report = ingest.ingest_source(
         path=conversation_path,
-        source_type="ai_conversation",
+        knowledge_type="ai_conversation",
         canonical_key=conversation_key,
     )
     search = make_search_service(db_session)
 
     response = search.search_knowledge(query=suffix, top_k=10)
-    markdown_only = search.search_knowledge(query=suffix, source_type="markdown_doc", top_k=10)
+    markdown_only = search.search_knowledge(query=suffix, knowledge_type="document", top_k=10)
     canonical_only = search.search_knowledge(query=suffix, canonical_key=conversation_key, top_k=10)
 
     assert response.query == suffix
@@ -72,13 +72,17 @@ def test_search_knowledge_returns_stable_result_shape_and_filters(db_session, tm
         "version_id",
         "canonical_key",
         "title",
-        "source_type",
+        "source_format",
+        "normalized_format",
+        "knowledge_type",
         "snippet",
         "score",
         "citation",
         "metadata",
     } == set(first)
     assert first["citation"]["locator"].startswith("line ")
+    assert first["source_format"] in {"md", "jsonl"}
+    assert first["normalized_format"] in {"markdown", "plain_text"}
     assert first["citation"]["line_start"] <= first["citation"]["line_end"]
     assert first["score"] > 0
     assert first["snippet"]
@@ -86,7 +90,7 @@ def test_search_knowledge_returns_stable_result_shape_and_filters(db_session, tm
         markdown_report.source_id,
         conversation_report.source_id,
     }
-    assert {result.source_type for result in markdown_only.results} == {"markdown_doc"}
+    assert {result.knowledge_type for result in markdown_only.results} == {"document"}
     assert {result.canonical_key for result in canonical_only.results} == {conversation_key}
 
 
@@ -107,13 +111,13 @@ def test_search_top_k_and_title_boost(db_session, tmp_path) -> None:
     ingest = make_ingest_service(db_session, tmp_path / "raw")
     title_report = ingest.ingest_source(
         path=title_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:title-{suffix}",
+        knowledge_type="document",
+        canonical_key=f"document:title-{suffix}",
     )
     ingest.ingest_source(
         path=body_path,
-        source_type="markdown_doc",
-        canonical_key=f"markdown_doc:body-{suffix}",
+        knowledge_type="document",
+        canonical_key=f"document:body-{suffix}",
     )
 
     response = make_search_service(db_session).search_knowledge(query=suffix, top_k=1)
@@ -142,10 +146,10 @@ def test_cli_search_command_outputs_response(monkeypatch, migrated_database_url,
         [
             "ingest",
             str(source_path),
-            "--source-type",
-            "markdown_doc",
+            "--knowledge-type",
+            "document",
             "--canonical-key",
-            f"markdown_doc:cli-search-{suffix}",
+            f"document:cli-search-{suffix}",
         ],
     )
 
@@ -156,7 +160,7 @@ def test_cli_search_command_outputs_response(monkeypatch, migrated_database_url,
     body = json.loads(result.stdout)
     assert body["query"] == suffix
     assert len(body["results"]) == 1
-    assert body["results"][0]["canonical_key"] == f"markdown_doc:cli-search-{suffix}"
+    assert body["results"][0]["canonical_key"] == f"document:cli-search-{suffix}"
 
 
 async def test_mcp_search_knowledge_tool_smoke(monkeypatch, migrated_database_url, tmp_path) -> None:
@@ -174,8 +178,8 @@ async def test_mcp_search_knowledge_tool_smoke(monkeypatch, migrated_database_ur
         "ingest_source",
         {
             "path": str(source_path),
-            "source_type": "markdown_doc",
-            "canonical_key": f"markdown_doc:mcp-search-{suffix}",
+            "knowledge_type": "document",
+            "canonical_key": f"document:mcp-search-{suffix}",
         },
     )
     result = await server.call_tool("search_knowledge", {"query": suffix, "top_k": 1})
@@ -183,4 +187,4 @@ async def test_mcp_search_knowledge_tool_smoke(monkeypatch, migrated_database_ur
     get_settings.cache_clear()
     assert "search_knowledge" in tool_names
     body = json.loads(result[0].text)
-    assert body["results"][0]["canonical_key"] == f"markdown_doc:mcp-search-{suffix}"
+    assert body["results"][0]["canonical_key"] == f"document:mcp-search-{suffix}"

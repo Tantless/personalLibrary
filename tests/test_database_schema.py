@@ -12,9 +12,11 @@ def test_initial_schema_and_indexes(db_session) -> None:
     version_indexes = {index["name"] for index in inspector.get_indexes("source_versions")}
     chunk_indexes = {index["name"] for index in inspector.get_indexes("chunks")}
 
-    assert "ix_sources_source_type" in source_indexes
+    assert "ix_sources_knowledge_type_code" in source_indexes
     assert "ix_source_versions_content_hash" in version_indexes
+    assert "ix_source_versions_source_format_code" in version_indexes
     assert "ix_chunks_search_vector" in chunk_indexes
+    assert "ix_chunks_knowledge_type_code" in chunk_indexes
 
 
 def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> None:
@@ -121,10 +123,35 @@ def test_foreign_key_column_comments_include_referenced_table_and_column(db_sess
 
 
 def _is_name_explanation_comment(comment: str | None) -> bool:
-    if comment is None or "：" not in comment or len(comment) > 60:
+    if comment is None or "：" not in comment or len(comment) > 120:
         return False
     name, explanation = comment.split("：", 1)
     return bool(name.strip()) and bool(explanation.strip())
+
+
+def test_enum_code_column_comments_include_int_mappings(db_session) -> None:
+    enum_comments = db_session.execute(
+        text(
+            """
+            select c.relname as table_name, a.attname as column_name, col_description(c.oid, a.attnum) as comment
+            from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            join pg_attribute a on a.attrelid = c.oid
+            where n.nspname = 'public'
+              and c.relkind = 'r'
+              and a.attname in ('source_format_code', 'normalized_format_code', 'knowledge_type_code')
+            order by c.relname, a.attname
+            """
+        )
+    ).mappings().all()
+
+    assert enum_comments
+    for row in enum_comments:
+        comment = row["comment"] or ""
+        assert "1:" in comment
+        assert "2:" in comment
+        if row["column_name"] in {"source_format_code", "knowledge_type_code"}:
+            assert "3:" in comment
 
 
 def test_chunks_search_vector_is_database_generated(db_session) -> None:
@@ -135,8 +162,8 @@ def test_chunks_search_vector_is_database_generated(db_session) -> None:
     db_session.execute(
         text(
             """
-            insert into sources (id, canonical_key, title, source_type)
-            values (:source_id, :canonical_key, :title, :source_type)
+            insert into sources (id, canonical_key, title, knowledge_type_code)
+            values (:source_id, :canonical_key, :title, :knowledge_type_code)
             on conflict (canonical_key) do nothing
             """
         ),
@@ -144,16 +171,16 @@ def test_chunks_search_vector_is_database_generated(db_session) -> None:
             "source_id": source_id,
             "canonical_key": "test:schema",
             "title": "Schema Test",
-            "source_type": "markdown_doc",
+            "knowledge_type_code": 1,
         },
     )
     db_session.execute(
         text(
             """
             insert into source_versions
-                (id, source_id, version_number, content_hash, file_path, raw_archive_path, status)
+                (id, source_id, version_number, content_hash, source_format_code, normalized_format_code, file_path, raw_archive_path, status)
             values
-                (:version_id, :source_id, 1, :content_hash, :file_path, :raw_archive_path, 'imported')
+                (:version_id, :source_id, 1, :content_hash, 1, 1, :file_path, :raw_archive_path, 'imported')
             on conflict (source_id, content_hash) do nothing
             """
         ),
@@ -162,16 +189,16 @@ def test_chunks_search_vector_is_database_generated(db_session) -> None:
             "source_id": source_id,
             "content_hash": "schema-hash",
             "file_path": "tests/fixtures/schema.md",
-            "raw_archive_path": "data/raw/markdown_doc/schema-source/schema-version/schema.md",
+            "raw_archive_path": "data/raw/document/schema-source/schema-version/schema.md",
         },
     )
     db_session.execute(
         text(
             """
             insert into chunks
-                (id, source_id, version_id, chunk_index, title, source_type, locator, line_start, line_end, content)
+                (id, source_id, version_id, chunk_index, title, source_format_code, normalized_format_code, knowledge_type_code, locator, line_start, line_end, content)
             values
-                (:chunk_id, :source_id, :version_id, 0, :title, :source_type, 'line 1-1', 1, 1, :content)
+                (:chunk_id, :source_id, :version_id, 0, :title, 1, 1, 1, 'line 1-1', 1, 1, :content)
             on conflict (version_id, chunk_index) do nothing
             """
         ),
@@ -180,7 +207,6 @@ def test_chunks_search_vector_is_database_generated(db_session) -> None:
             "source_id": source_id,
             "version_id": version_id,
             "title": "Context Pack",
-            "source_type": "markdown_doc",
             "content": "Context Pack evidence citations",
         },
     )

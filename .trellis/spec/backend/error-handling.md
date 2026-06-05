@@ -35,7 +35,7 @@ IngestItemReport.error              # short reason, no source content
 
 ### 3. Contracts
 
-- `IngestInputError` covers invalid local path usage, unsupported source types, unsupported extensions, URLs, and ambiguous directory canonical keys.
+- `IngestInputError` covers invalid local path usage, unsupported knowledge types, unsupported extensions, URLs, and ambiguous directory canonical keys.
 - `IngestParseError` covers invalid UTF-8, invalid JSONL, empty documents, and parser output with no chunks.
 - `ingest_source()` creates an `ingest_jobs` row before validating the input path existence so failed local path attempts are recorded.
 - Directory ingest catches per-file exceptions, rolls back that file, records a failed item, and continues.
@@ -43,7 +43,7 @@ IngestItemReport.error              # short reason, no source content
 
 Search behavior:
 
-- `SearchInputError` covers empty query, unsupported `source_type`, and invalid `top_k`.
+- `SearchInputError` covers empty query, unsupported `knowledge_type`, and invalid `top_k`.
 - Search with no matches returns a valid response with `results: []`; it is not an error.
 - Interface layers should return the stable search response shape for zero and nonzero results.
 
@@ -70,7 +70,7 @@ Context Pack behavior:
 | Invalid UTF-8 file inside directory | Failed item, remaining files still ingest |
 | Duplicate content hash | Report status `skipped`, no new chunks |
 | Empty search query | `SearchInputError` |
-| Unsupported search `source_type` | `SearchInputError` |
+| Unsupported search `knowledge_type` | `SearchInputError` |
 | Search no results | Valid response with empty `results` |
 | Missing `chunk_id` | `ReadSourceError` |
 | Missing source/version | `ReadSourceError` |

@@ -74,13 +74,13 @@ Good:
 ```python
 report = IngestService.from_settings(settings).ingest_source(
     path=path,
-    source_type=source_type,
+    knowledge_type=knowledge_type,
     canonical_key=canonical_key,
 )
 
 response = SearchService.from_settings(settings).search_knowledge(
     query=query,
-    source_type=source_type,
+    knowledge_type=knowledge_type,
     canonical_key=canonical_key,
     top_k=top_k,
 )
@@ -95,7 +95,7 @@ fragment = ReadSourceService.from_settings(settings).read_source(
 
 pack = ContextPackService.from_settings(settings).get_context_pack(
     query=query,
-    source_type=source_type,
+    knowledge_type=knowledge_type,
     canonical_key=canonical_key,
     top_k=top_k,
     budget_tokens=budget_tokens,
