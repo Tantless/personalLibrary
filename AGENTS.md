@@ -43,7 +43,10 @@ This temporary block preserves only the confirmed MVP planning state. The detail
 
 After each complete PR-sized step is implemented and verified, inspect the working tree. If the changed content is coherent and committable, commit it immediately with a focused commit message before starting the next PR-sized step.
 
-Database schema comments: every persisted PostgreSQL table/column needs concise Chinese `中文名：解释`; FK columns must include `外键，关联 table.column`.
+Database modeling:
+* Persisted PostgreSQL table/column comments use concise Chinese `中文名：解释`; FK columns must include `外键，关联 table.column`.
+* Do not mix file format and knowledge semantics in one field; separate source format, normalized format, and knowledge type when modeling sources.
+* Persisted enum fields use int storage; column comments must list each int mapping, e.g. `1:md，2:pdf`.
 
 ## MVP Scope
 
