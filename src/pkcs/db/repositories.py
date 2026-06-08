@@ -4,7 +4,35 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pkcs.db.models import Chunk, Citation, IngestJob, Source, SourceVersion
+from pkcs.db.models import Chunk, Citation, IngestJob, Source, SourceKeyCounter, SourceVersion
+
+
+class SourceKeyCounterRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def allocate(self, prefix: str) -> str:
+        while True:
+            number = self._next_number(prefix)
+            canonical_key = f"{prefix}{number:05d}"
+            if self.session.scalar(select(Source.id).where(Source.canonical_key == canonical_key)) is None:
+                return canonical_key
+
+    def _next_number(self, prefix: str) -> int:
+        counter = self.session.scalar(
+            select(SourceKeyCounter).where(SourceKeyCounter.prefix == prefix).with_for_update()
+        )
+        if counter is None:
+            counter = SourceKeyCounter(prefix=prefix, next_number=2)
+            self.session.add(counter)
+            self.session.flush()
+            return 1
+        number = counter.next_number
+        if number > 99999:
+            raise ValueError(f"canonical key counter exhausted for prefix: {prefix}")
+        counter.next_number = number + 1
+        self.session.flush()
+        return number
 
 
 class SourceRepository:
@@ -39,13 +67,11 @@ class SourceRepository:
         canonical_key: str,
         title: str,
         knowledge_type_code: int,
-        origin_uri: str | None = None,
     ) -> Source:
         source = Source(
             canonical_key=canonical_key,
             title=title,
             knowledge_type_code=knowledge_type_code,
-            origin_uri=origin_uri,
         )
         self.session.add(source)
         self.session.flush()
@@ -58,7 +84,6 @@ class SourceRepository:
         content_hash: str,
         source_format_code: int,
         normalized_format_code: int,
-        file_path: str,
         raw_archive_path: str,
         version_id: str | None = None,
         status: str = "imported",
@@ -76,7 +101,6 @@ class SourceRepository:
             content_hash=content_hash,
             source_format_code=source_format_code,
             normalized_format_code=normalized_format_code,
-            file_path=file_path,
             raw_archive_path=raw_archive_path,
             status=status,
             supersedes_version_id=supersedes_version_id,
@@ -183,13 +207,13 @@ class IngestJobRepository:
         self,
         *,
         knowledge_type_code: int,
-        input_path: str,
+        input_name: str,
         status: str = "started",
         summary_json: dict[str, Any] | None = None,
     ) -> IngestJob:
         job = IngestJob(
             knowledge_type_code=knowledge_type_code,
-            input_path=input_path,
+            input_name=input_name,
             status=status,
             summary_json=summary_json or {},
         )

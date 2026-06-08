@@ -116,4 +116,4 @@ Logging or returning full source content in an error message.
 
 #### Correct
 
-Return file path, status, and a short reason only.
+Return input name, status, and a short reason only.

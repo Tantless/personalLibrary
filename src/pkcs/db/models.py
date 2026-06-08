@@ -15,6 +15,13 @@ class Base(DeclarativeBase):
     pass
 
 
+class SourceKeyCounter(Base):
+    __tablename__ = "source_key_counters"
+
+    prefix: Mapped[str] = mapped_column(String(8), primary_key=True)
+    next_number: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class Source(Base):
     __tablename__ = "sources"
 
@@ -22,7 +29,6 @@ class Source(Base):
     canonical_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     knowledge_type_code: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    origin_uri: Mapped[str | None] = mapped_column(Text)
     current_version_id: Mapped[str | None] = mapped_column(String(36))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -44,7 +50,6 @@ class SourceVersion(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     source_format_code: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     normalized_format_code: Mapped[int] = mapped_column(Integer, nullable=False)
-    file_path: Mapped[str] = mapped_column(Text, nullable=False)
     raw_archive_path: Mapped[str] = mapped_column(Text, nullable=False)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     status: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -111,7 +116,7 @@ class IngestJob(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     knowledge_type_code: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    input_path: Mapped[str] = mapped_column(Text, nullable=False)
+    input_name: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

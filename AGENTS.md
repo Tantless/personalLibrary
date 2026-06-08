@@ -47,6 +47,7 @@ Database modeling:
 * Persisted PostgreSQL table/column comments use concise Chinese `中文名：解释`; FK columns must include `外键，关联 table.column`.
 * Do not mix file format and knowledge semantics in one field; separate source format, normalized format, and knowledge type when modeling sources.
 * Persisted enum fields use int storage; column comments must list each int mapping, e.g. `1:md，2:pdf`.
+* User ingest paths are one-time inputs only; Raw Archive is the internal source file, and default `canonical_key` uses knowledge-type prefix + five-digit DB counter.
 
 ## MVP Scope
 

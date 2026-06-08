@@ -9,7 +9,7 @@
 * 当前 `source_type` 枚举为 `markdown_doc` 与 `ai_conversation`。
 * `markdown_doc` 更像文件格式/载体命名，`ai_conversation` 更像内容语义/用途命名，二者不在同一分类维度。
 * 当前 `source_type` 已进入 `sources`、`chunks`、`ingest_jobs`，并影响 parser 分发、Raw Archive 路径、search filter、Context Pack 展示、CLI/MCP 参数和验收语料。
-* 当前 `canonical_key` 未传时使用 `source_type + ":" + normalized_absolute_file_path`。
+* 旧设计中，`canonical_key` 未传时使用 `source_type + ":" + normalized_absolute_file_path`。
 * 当前数据库枚举字段以字符串存储，例如 `source_type = "markdown_doc"`。
 * 用户已提出数据库建模规范：枚举值字段应映射为 int 存储，并在中文注释中说明每个 int 对应含义。
 
@@ -37,6 +37,12 @@
 * 更新 README、MVP PRD、测试夹具和验收查询字段命名，避免继续强化旧概念。
 * MVP 第一阶段 `knowledge_type_code` 只落地 `1:document` 与 `2:ai_conversation`。
 * 第二阶段再评估是否预置 wiki、game_guide、diary、email 等更细知识内容类型；本任务先保留字段设计位置，不实现复杂分类。
+* 用户导入时的原始路径只作为单次输入路径，不作为长期资料链接或默认资料身份。
+* Raw Archive 中的归档文件是 PKCS 内部认定的源文件，后续证据读取、版本回溯和 Context Pack 均以 Raw Archive 为准。
+* 删除或废弃长期表中的用户原始路径字段：`sources.origin_uri`、`source_versions.file_path`。
+* `ingest_jobs` 不保存完整用户输入路径，只保存文件名/目录名级别的 `input_name`。
+* 未显式传 `canonical_key` 时，按知识类型前缀加五位递增编号自动生成，例如 `A00001`、`D00001`。
+* 自动编号必须由数据库事务分配，避免重复。
 
 ## Acceptance Criteria
 
@@ -46,6 +52,11 @@
 * [x] Ingest、search、read_source、context_pack 流程仍通过测试。
 * [x] `canonical_key` fallback 策略同步调整，避免继续依赖旧 `source_type`。
 * [x] README 和任务文档解释新字段含义、枚举映射和当前 MVP 支持范围。
+* [x] 用户原始路径不再作为默认 `canonical_key` 来源。
+* [x] `sources` 和 `source_versions` 不再保存用户原始完整路径。
+* [x] `ingest_jobs` 不再保存用户原始完整路径，仅保存 `input_name`。
+* [x] 未传 `canonical_key` 时按知识类型前缀和五位递增编号生成 key。
+* [x] 删除原始文件后，`search -> read_source -> context_pack` 仍能从 Raw Archive 读回证据。
 
 ## Definition of Done
 
@@ -89,15 +100,27 @@ Candidate fields:
 
 **Consequences**: The first migration stays focused and fixes the modeling error without over-classifying personal knowledge. Future categories have a planned place, but they should be added only when ingest/search behavior actually needs them.
 
+## Decision (ADR-lite): Raw Archive Source Identity
+
+**Context**: The previous fallback used `knowledge_type + normalized_absolute_file_path` as `canonical_key`. The user clarified that the original ingest path is not trustworthy as a long-lived link; it should be treated as one-time input only. PKCS should treat the Raw Archive copy as the internal source file.
+
+**Decision**: Remove original full paths from long-lived source/version tables, stop using original paths for default `canonical_key`, store only input basename in ingest jobs/reports, and generate default canonical keys from knowledge-type prefix plus a five-digit database counter.
+
+**Consequences**: Unkeyed imports become new PKCS sources with internal identities such as `D00001` or `A00001`. Users who want multiple imports to share one version chain must pass the same explicit `canonical_key`. Evidence recovery no longer depends on the original user path.
+
 ## Implementation Result
 
-Completed on 2026-06-05.
+Initial split completed on 2026-06-05. Raw Archive source identity cleanup completed on 2026-06-08.
 
 * Added `source_format_code`, `normalized_format_code`, and `knowledge_type_code` database modeling.
 * Replaced public `source_type` CLI/MCP/service contract with `knowledge_type`.
 * Search/read/context-pack outputs now expose `source_format`, `normalized_format`, and `knowledge_type` strings while the database stores int codes.
 * Raw Archive now writes under `knowledge_type/source_id/version_id`.
 * Updated README, backend specs, AGENTS, tests, and MVP PRD references.
+* Removed persisted original full input paths from `sources`, `source_versions`, and `ingest_jobs`.
+* Added `source_key_counters` and generated default keys such as `D00001` and `A00001`.
+* Ingest reports now expose `input_name` instead of the full original input path.
+* Added coverage proving Raw Archive read-back still works after deleting the original input file.
 
 Verification:
 

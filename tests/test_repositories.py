@@ -1,6 +1,12 @@
 from uuid import uuid4
 
-from pkcs.db.repositories import ChunkRepository, CitationRepository, IngestJobRepository, SourceRepository
+from pkcs.db.repositories import (
+    ChunkRepository,
+    CitationRepository,
+    IngestJobRepository,
+    SourceKeyCounterRepository,
+    SourceRepository,
+)
 from pkcs.source_metadata import (
     KNOWLEDGE_TYPE_DOCUMENT,
     NORMALIZED_FORMAT_MARKDOWN,
@@ -14,19 +20,19 @@ def test_repository_crud_round_trip(db_session) -> None:
     chunks = ChunkRepository(db_session)
     citations = CitationRepository(db_session)
     ingest_jobs = IngestJobRepository(db_session)
+    source_keys = SourceKeyCounterRepository(db_session)
+    generated_key = source_keys.allocate("D")
 
     source = sources.create_source(
-        canonical_key=f"document:test-{suffix}",
+        canonical_key=generated_key,
         title="Repository Test",
         knowledge_type_code=KNOWLEDGE_TYPE_DOCUMENT,
-        origin_uri="tests/fixtures/repository-test.md",
     )
     version = sources.create_version(
         source=source,
         content_hash=f"hash-{suffix}",
         source_format_code=SOURCE_FORMAT_MD,
         normalized_format_code=NORMALIZED_FORMAT_MARKDOWN,
-        file_path="tests/fixtures/repository-test.md",
         raw_archive_path=f"data/raw/document/{source.id}/version/repository-test.md",
     )
     chunk = chunks.create_chunk(
@@ -54,15 +60,18 @@ def test_repository_crud_round_trip(db_session) -> None:
     )
     job = ingest_jobs.create_job(
         knowledge_type_code=KNOWLEDGE_TYPE_DOCUMENT,
-        input_path="tests/fixtures/repository-test.md",
+        input_name="repository-test.md",
         summary_json={"succeeded": [source.id], "skipped": [], "failed": []},
     )
     db_session.commit()
 
-    loaded_source = sources.get_by_canonical_key(f"document:test-{suffix}")
+    loaded_source = sources.get_by_canonical_key(generated_key)
     loaded_chunk = chunks.get(chunk.id)
 
     assert loaded_source is not None
+    assert generated_key.startswith("D")
+    assert len(generated_key) == 6
+    assert generated_key[1:].isdigit()
     assert loaded_source.current_version_id == version.id
     assert loaded_chunk is not None
     assert loaded_chunk.heading_path == ["Repository Test"]

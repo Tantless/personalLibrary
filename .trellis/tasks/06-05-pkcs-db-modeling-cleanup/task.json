@@ -4,7 +4,7 @@
   "title": "brainstorm: PKCS database modeling cleanup",
   "description": "Clarify and normalize PKCS MVP database modeling around file format, knowledge type, parser behavior, and integer-coded enum fields.",
   "status": "planning",
-  "dev_type": null,
+  "dev_type": "backend",
   "scope": null,
   "package": null,
   "priority": "P1",

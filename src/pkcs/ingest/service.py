@@ -9,17 +9,23 @@ from sqlalchemy.orm import Session
 
 from pkcs.config import Settings, get_settings
 from pkcs.db.models import IngestJob, new_id
-from pkcs.db.repositories import ChunkRepository, CitationRepository, IngestJobRepository, SourceRepository
+from pkcs.db.repositories import (
+    ChunkRepository,
+    CitationRepository,
+    IngestJobRepository,
+    SourceKeyCounterRepository,
+    SourceRepository,
+)
 from pkcs.db.session import create_session_factory
 from pkcs.ingest.models import (
     SUPPORTED_EXTENSIONS,
     SUPPORTED_KNOWLEDGE_TYPES,
     IngestItemReport,
     IngestReport,
-    canonical_key_for_path,
 )
 from pkcs.ingest.parsers import IngestParseError, parse_source_file
 from pkcs.source_metadata import (
+    canonical_key_prefix_for_knowledge_type,
     knowledge_type_code_for_name,
     knowledge_type_name,
     normalized_format_code_for_source_format,
@@ -77,14 +83,14 @@ class IngestService:
         with self.session_factory() as session:
             job = IngestJobRepository(session).create_job(
                 knowledge_type_code=knowledge_type_code,
-                input_path=str(input_path),
+                input_name=self._input_name(input_path),
             )
             session.commit()
 
             try:
                 files, skipped = self._resolve_input_files(input_path, knowledge_type, canonical_key)
             except Exception as exc:
-                failed_item = IngestItemReport(input_path=str(input_path), status="failed", error=str(exc))
+                failed_item = IngestItemReport(input_name=self._input_name(input_path), status="failed", error=str(exc))
                 report = self._build_report(
                     job_id=job.id,
                     status="failed",
@@ -110,11 +116,15 @@ class IngestService:
                     session.commit()
                 except Exception as exc:
                     session.rollback()
-                    item = IngestItemReport(input_path=str(file_path), status="failed", error=str(exc))
+                    item = IngestItemReport(input_name=self._input_name(file_path), status="failed", error=str(exc))
                     failed.append(item)
                     logger.exception(
                         "ingest_file_failed",
-                        extra={"event": "ingest_file_failed", "path": str(file_path), "knowledge_type": knowledge_type},
+                        extra={
+                            "event": "ingest_file_failed",
+                            "input_name": self._input_name(file_path),
+                            "knowledge_type": knowledge_type,
+                        },
                     )
                     continue
 
@@ -173,7 +183,7 @@ class IngestService:
         resolved_path = path.resolve()
         content_bytes = resolved_path.read_bytes()
         content_hash = hashlib.sha256(content_bytes).hexdigest()
-        resolved_canonical_key = canonical_key or canonical_key_for_path(knowledge_type, resolved_path)
+        resolved_canonical_key = canonical_key or self._allocate_canonical_key(session, knowledge_type_code)
 
         source_repo = SourceRepository(session)
         existing_source = source_repo.get_by_canonical_key(resolved_canonical_key)
@@ -189,7 +199,7 @@ class IngestService:
             )
             if existing_version is not None:
                 return IngestItemReport(
-                    input_path=str(path),
+                    input_name=self._input_name(path),
                     status="skipped",
                     source_id=existing_source.id,
                     version_id=existing_version.id,
@@ -211,7 +221,6 @@ class IngestService:
             canonical_key=resolved_canonical_key,
             title=parsed.title,
             knowledge_type_code=knowledge_type_code,
-            origin_uri=resolved_path.as_posix(),
         )
 
         version_id = new_id()
@@ -228,12 +237,11 @@ class IngestService:
             content_hash=content_hash,
             source_format_code=source_format_code,
             normalized_format_code=normalized_format_code,
-            file_path=resolved_path.as_posix(),
             raw_archive_path=raw_archive_path.as_posix(),
             metadata_json={
                 **parsed.metadata_json,
                 "canonical_key": resolved_canonical_key,
-                "original_filename": resolved_path.name,
+                "input_name": resolved_path.name,
                 "source_format": source_format_name(source_format_code),
                 "normalized_format": normalized_format_name(normalized_format_code),
                 "knowledge_type": knowledge_type,
@@ -270,7 +278,7 @@ class IngestService:
             )
 
         return IngestItemReport(
-            input_path=str(path),
+            input_name=self._input_name(path),
             status="succeeded",
             source_id=source.id,
             version_id=version.id,
@@ -298,7 +306,7 @@ class IngestService:
                 if child.is_dir():
                     skipped.append(
                         IngestItemReport(
-                            input_path=str(child),
+                            input_name=self._input_name(child),
                             status="skipped",
                             error="recursive directory ingest is not supported",
                         )
@@ -309,13 +317,13 @@ class IngestService:
                 elif child.is_file():
                     skipped.append(
                         IngestItemReport(
-                            input_path=str(child),
+                            input_name=self._input_name(child),
                             status="skipped",
                             error=f"unsupported extension for {knowledge_type}: {child.suffix.lower()}",
                         )
                     )
             return files, skipped
-        raise IngestInputError(f"input path does not exist: {input_path}")
+        raise IngestInputError("input path does not exist")
 
     def _finish_job(
         self,
@@ -399,3 +407,10 @@ class IngestService:
     def _reject_url(self, raw_path: str) -> None:
         if "://" in raw_path:
             raise IngestInputError("ingest_source accepts local file paths only")
+
+    def _allocate_canonical_key(self, session: Session, knowledge_type_code: int) -> str:
+        prefix = canonical_key_prefix_for_knowledge_type(knowledge_type_code)
+        return SourceKeyCounterRepository(session).allocate(prefix)
+
+    def _input_name(self, path: Path | str) -> str:
+        return Path(path).name or "input"

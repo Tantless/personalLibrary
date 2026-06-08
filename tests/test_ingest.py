@@ -8,9 +8,12 @@ from typer.testing import CliRunner
 
 from pkcs.cli import app as cli_app
 from pkcs.config import get_settings
-from pkcs.db.models import Chunk, Citation, SourceVersion
+from pkcs.context_pack import ContextPackService
+from pkcs.db.models import Chunk, Citation, IngestJob, SourceVersion
 from pkcs.ingest import IngestService
 from pkcs.mcp.server import create_mcp_server
+from pkcs.reader import ReadSourceService
+from pkcs.search import PostgresFTSSearchProvider, SearchService
 from pkcs.storage.raw_archive import RawArchiveWriter
 
 
@@ -53,7 +56,7 @@ def test_ingest_markdown_file_creates_version_chunks_citations_and_archive(db_se
     version = db_session.get(SourceVersion, report.version_id)
     assert version is not None
     assert Path(version.raw_archive_path).exists()
-    assert version.metadata_json["original_filename"] == "notes.md"
+    assert version.metadata_json["input_name"] == "notes.md"
 
     chunks = db_session.scalars(select(Chunk).where(Chunk.version_id == report.version_id)).all()
     citations = db_session.scalars(select(Citation).where(Citation.version_id == report.version_id)).all()
@@ -104,9 +107,51 @@ def test_ingest_directory_is_non_recursive_and_continues_after_file_failure(db_s
     assert len(report.succeeded) == 1
     assert len(report.failed) == 1
     assert len(report.skipped) == 2
-    assert report.succeeded[0].input_path.endswith("good.md")
-    assert report.failed[0].input_path.endswith("bad.md")
-    assert {Path(item.input_path).name for item in report.skipped} == {"ignore.bin", "nested"}
+    assert report.succeeded[0].input_name == "good.md"
+    assert report.failed[0].input_name == "bad.md"
+    assert {item.input_name for item in report.skipped} == {"ignore.bin", "nested"}
+
+
+def test_ingest_without_canonical_key_uses_prefix_key_and_reads_archive_after_input_deleted(
+    db_session,
+    tmp_path,
+) -> None:
+    token = uuid4().hex
+    source_path = tmp_path / "auto-key.md"
+    source_path.write_text("# Auto Key\n\n" f"Raw archive keeps {token} readable.\n", encoding="utf-8")
+    service = make_service(db_session, tmp_path / "raw")
+
+    report = service.ingest_source(path=source_path, knowledge_type="document")
+    job = db_session.get(IngestJob, report.ingest_job_id)
+    source_path.unlink()
+    search_service = SearchService(
+        provider=PostgresFTSSearchProvider(session_factory=lambda: nullcontext(db_session)),
+        default_top_k=10,
+    )
+    read_service = ReadSourceService(session_factory=lambda: nullcontext(db_session))
+    context_pack_service = ContextPackService(
+        search_service=search_service,
+        read_source_service=read_service,
+        default_top_k=10,
+        max_evidence=10,
+        max_evidence_per_source=3,
+    )
+    search_result = search_service.search_knowledge(query=token, top_k=1).results[0]
+    fragment = read_service.read_source(chunk_id=search_result.chunk_id)
+    context_pack = context_pack_service.get_context_pack(query=token, top_k=1)
+
+    assert report.status == "completed"
+    assert report.canonical_key is not None
+    assert report.canonical_key.startswith("D")
+    assert len(report.canonical_key) == 6
+    assert report.canonical_key[1:].isdigit()
+    assert report.succeeded[0].input_name == "auto-key.md"
+    assert job is not None
+    assert job.input_name == "auto-key.md"
+    assert search_result.canonical_key == report.canonical_key
+    assert token in fragment.content
+    assert context_pack.evidence
+    assert token in context_pack.evidence[0].content
 
 
 def test_ingest_ai_conversation_transcript_and_jsonl_metadata(db_session, tmp_path) -> None:

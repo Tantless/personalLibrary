@@ -58,6 +58,14 @@ KNOWLEDGE_TYPE_NAMES = {
     KNOWLEDGE_TYPE_EMAIL: "email",
 }
 KNOWLEDGE_TYPE_CODES = {name: code for code, name in KNOWLEDGE_TYPE_NAMES.items()}
+KNOWLEDGE_TYPE_KEY_PREFIXES = {
+    KNOWLEDGE_TYPE_DOCUMENT: "D",
+    KNOWLEDGE_TYPE_AI_CONVERSATION: "A",
+    KNOWLEDGE_TYPE_WIKI_ARTICLE: "W",
+    KNOWLEDGE_TYPE_GAME_GUIDE: "G",
+    KNOWLEDGE_TYPE_DIARY: "J",
+    KNOWLEDGE_TYPE_EMAIL: "E",
+}
 
 SUPPORTED_KNOWLEDGE_TYPE_CODES = {KNOWLEDGE_TYPE_DOCUMENT, KNOWLEDGE_TYPE_AI_CONVERSATION}
 SUPPORTED_SOURCE_FORMAT_CODES_BY_KNOWLEDGE_TYPE = {
@@ -102,13 +110,16 @@ def knowledge_type_name(knowledge_type_code: int) -> str:
     return KNOWLEDGE_TYPE_NAMES.get(knowledge_type_code, f"unknown:{knowledge_type_code}")
 
 
+def canonical_key_prefix_for_knowledge_type(knowledge_type_code: int) -> str:
+    try:
+        return KNOWLEDGE_TYPE_KEY_PREFIXES[knowledge_type_code]
+    except KeyError as exc:
+        raise ValueError(f"unsupported canonical key prefix for knowledge_type_code: {knowledge_type_code}") from exc
+
+
 def validate_source_format_for_knowledge_type(*, source_format_code: int, knowledge_type_code: int) -> None:
     supported = SUPPORTED_SOURCE_FORMAT_CODES_BY_KNOWLEDGE_TYPE.get(knowledge_type_code, set())
     if source_format_code not in supported:
         source_format = source_format_name(source_format_code)
         knowledge_type = knowledge_type_name(knowledge_type_code)
         raise ValueError(f"unsupported source format for {knowledge_type}: {source_format}")
-
-
-def canonical_key_for_path(knowledge_type: str, path: Path) -> str:
-    return f"{knowledge_type}:{path.resolve().as_posix()}"

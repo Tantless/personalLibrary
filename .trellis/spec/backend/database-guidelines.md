@@ -32,6 +32,7 @@ Repository constructors:
 
 ```python
 SourceRepository(session: Session)
+SourceKeyCounterRepository(session: Session)
 ChunkRepository(session: Session)
 CitationRepository(session: Session)
 IngestJobRepository(session: Session)
@@ -44,13 +45,14 @@ SourceRepository.get(source_id)
 SourceRepository.get_by_canonical_key(canonical_key)
 SourceRepository.get_version_by_hash(source_id, content_hash)
 SourceRepository.get_version(source_id, version_id)
-SourceRepository.create_source(canonical_key, title, knowledge_type_code, origin_uri=None)
-SourceRepository.create_version(source, content_hash, source_format_code, normalized_format_code, file_path, raw_archive_path, version_id=None, status="imported", metadata_json=None)
+SourceKeyCounterRepository.allocate(prefix)
+SourceRepository.create_source(canonical_key, title, knowledge_type_code)
+SourceRepository.create_version(source, content_hash, source_format_code, normalized_format_code, raw_archive_path, version_id=None, status="imported", metadata_json=None)
 ChunkRepository.create_chunk(source_id, version_id, chunk_index, title, source_format_code, normalized_format_code, knowledge_type_code, locator, line_start, line_end, content, ...)
 ChunkRepository.get(chunk_id)
 ChunkRepository.get_by_locator(source_id, version_id, locator)
 CitationRepository.create_citation(source_id, version_id, chunk_id, locator, line_start, line_end, quote=None, metadata_json=None)
-IngestJobRepository.create_job(knowledge_type_code, input_path, status="started", summary_json=None)
+IngestJobRepository.create_job(knowledge_type_code, input_name, status="started", summary_json=None)
 IngestJobRepository.finish_job(job, status, summary_json, error_message=None)
 ```
 
@@ -84,7 +86,16 @@ Core tables:
 - `source_versions`: immutable source versions; stores `source_format_code` and `normalized_format_code`; `(source_id, content_hash)` and `(source_id, version_number)` are unique; `raw_archive_path` must point to the archived raw file.
 - `chunks`: searchable evidence units; stores denormalized `source_format_code`, `normalized_format_code`, and `knowledge_type_code`; `(version_id, chunk_index)` is unique; locator fields use `locator`, `line_start`, and `line_end`.
 - `citations`: source/version/chunk-linked evidence references for future `read_source` and Context Pack output.
-- `ingest_jobs`: MVP audit surface for ingest status and per-run summaries.
+- `ingest_jobs`: MVP audit surface for ingest status and per-run summaries; stores `input_name`, not the original full input path.
+- `source_key_counters`: transactional counters for generated default `canonical_key` values such as `D00001` and `A00001`.
+
+Source identity:
+
+- Treat user-provided ingest paths as one-time input locations only.
+- Do not persist original full ingest paths as long-lived source/version identity.
+- Raw Archive is the internal source file for evidence read-back after ingest.
+- If users need multiple imports to become versions of the same source, they must pass the same explicit `canonical_key`.
+- If `canonical_key` is omitted, generate a fresh key from knowledge-type prefix plus five-digit database counter.
 
 Schema comments:
 
@@ -139,6 +150,7 @@ Transaction boundary:
 - Callers own `commit()` and `rollback()`.
 - Do not hide transaction commits inside repositories.
 - Ingest may pass a pre-generated `version_id` to `create_version()` so Raw Archive paths can include `source_id/version_id` before the database row is inserted.
+- Default canonical key counters must be advanced inside the same caller-owned transaction.
 
 ### 4. Validation & Error Matrix
 
@@ -148,6 +160,8 @@ Transaction boundary:
 | Duplicate `sources.canonical_key` | Database rejects the duplicate | Unique constraint remains present |
 | Duplicate `(source_id, content_hash)` | Database rejects duplicate source version content | `uq_source_versions_source_hash` remains present |
 | Duplicate `(version_id, chunk_index)` | Database rejects duplicate chunk order | `uq_chunks_version_chunk_index` remains present |
+| Missing explicit canonical key | Application generates prefix + five-digit key from `source_key_counters` | Ingest test asserts key shape |
+| Original input file deleted after ingest | `read_source` still reads evidence from Raw Archive | Ingest or reader test unlinks input file and reads by chunk |
 | Insert chunk without `search_vector` | Database generates `search_vector` | `test_chunks_search_vector_is_database_generated` |
 | Repository create methods called | IDs are available after method returns | Repository tests assert persisted rows |
 | Duplicate ingest for same canonical source and content hash | Application skips new version creation | Ingest tests assert the existing version id is returned |
@@ -169,7 +183,7 @@ Good:
 
 ```python
 source = SourceRepository(session).create_source(
-    canonical_key="document:C:/notes/example.md",
+    canonical_key="D00001",
     title="example.md",
     knowledge_type_code=1,
 )
@@ -178,7 +192,6 @@ version = SourceRepository(session).create_version(
     content_hash="sha256hex",
     source_format_code=1,
     normalized_format_code=1,
-    file_path="C:/notes/example.md",
     raw_archive_path="data/raw/document/source/version/example.md",
 )
 session.commit()
@@ -203,7 +216,7 @@ session.commit()
 - `tests/test_database_schema.py`: foreign key column comments must include the referenced table and column.
 - `tests/test_repositories.py`: repository write/read behavior and caller-owned commit.
 - `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
-- `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, and ingest job summaries.
+- `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, generated canonical keys, Raw Archive read-back after input deletion, and ingest job summaries.
 - `tests/test_search.py`: PostgreSQL FTS query, title boost, filters, top_k, no-results, and interface smoke tests.
 - `tests/test_reader.py`: `chunk_id`, source/version/locator, `context_lines`, invalid locator, CLI, and MCP.
 - `tests/test_context_pack.py`: evidence caps, per-source limit, budget, caveats, read_source mapping, CLI, and MCP.
@@ -247,7 +260,7 @@ path = Path(source_version.raw_archive_path)
 lines = path.read_text(encoding="utf-8-sig").splitlines()
 ```
 
-Do not read from `source_versions.file_path` for evidence recovery because the original file may have moved or changed after ingest.
+Do not add or read from a persisted original input path for evidence recovery because the original file may have moved or changed after ingest.
 
 Context Pack must preserve traceability:
 
@@ -266,6 +279,7 @@ Do not put evidence content into a Context Pack without refs that can be read ba
 - Adding a table or column without a Chinese PostgreSQL comment; this makes DBeaver inspection ambiguous.
 - Writing paragraph-length schema comments; DBeaver comments should stay scannable as `<中文名>：<解释>`.
 - Writing a foreign key comment without the referenced table and column; DBeaver users need the relationship without opening constraints.
+- Persisting the original full ingest path as source identity; Raw Archive and `canonical_key` own long-lived identity after ingest.
 - Committing inside repository methods, which makes multi-table ingest rollback unsafe.
 - Writing optional PostgreSQL filter clauses as `:knowledge_type_code is null`; cast nullable params with `cast(:knowledge_type_code as integer)` so PostgreSQL can infer the type.
 - Reading current source files instead of Raw Archive in `read_source`; this breaks version traceability.

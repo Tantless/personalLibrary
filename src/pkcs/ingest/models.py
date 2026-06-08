@@ -6,7 +6,6 @@ from pkcs.source_metadata import (
     KNOWLEDGE_TYPE_DOCUMENT,
     SOURCE_FORMAT_CODES_BY_EXTENSION,
     SUPPORTED_SOURCE_FORMAT_CODES_BY_KNOWLEDGE_TYPE,
-    canonical_key_for_path,
     knowledge_type_name,
     source_format_name,
 )
@@ -51,7 +50,7 @@ class ParsedSource:
 
 @dataclass(frozen=True)
 class IngestItemReport:
-    input_path: str
+    input_name: str
     status: ItemStatus
     source_id: str | None = None
     version_id: str | None = None
@@ -107,6 +106,5 @@ __all__ = [
     "IngestReport",
     "ParsedChunk",
     "ParsedSource",
-    "canonical_key_for_path",
     "source_format_name",
 ]

@@ -9,7 +9,7 @@
 ### 1. Scope / Trigger
 
 - Trigger: Changes to ingest, search, read_source, context_pack, or failure-path logging.
-- MVP privacy rule: Logs may include IDs, paths, status, counts, and short error summaries. Logs must not include full source content, chunks, quotes, secrets, or raw private text.
+- MVP privacy rule: Logs may include IDs, input names, status, counts, and short error summaries. Logs must not include full source content, chunks, quotes, secrets, raw private text, or original full ingest paths.
 
 ### 2. Signatures
 
@@ -36,7 +36,7 @@ context_pack_completed
 
 - Include `event` in `extra` for machine-readable logs.
 - Include stable references when available: `source_id`, `version_id`, `knowledge_type`, `chunks_created`.
-- For failures, include path and knowledge_type, but not content.
+- For failures, include `input_name` and `knowledge_type`, but not content or the original full input path.
 - For search, include `knowledge_type`, `top_k`, and `result_count`; do not log the full query text.
 - For `read_source`, include source/version/chunk refs and `context_lines`; do not log returned content.
 - For Context Pack, include `knowledge_type`, `top_k`, and `evidence_count`; do not log the query, evidence content, or Markdown body.
@@ -48,7 +48,8 @@ context_pack_completed
 |--------------|----------|--------|
 | `source_id`, `version_id` | Yes | Stable non-content refs |
 | `canonical_key` | Use care | May contain local paths; prefer DB report over logs |
-| Local path | Yes for local MVP, but no content | Needed to debug ingest |
+| `input_name` | Yes | Enough to identify item-level ingest outcomes |
+| Local full path | No by default | Import locations are one-time inputs, not durable identity |
 | Search query text | No by default | May contain private intent or pasted content |
 | `read_source` returned content | No | Direct source material |
 | Context Pack Markdown | No | Aggregated private source material |

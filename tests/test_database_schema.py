@@ -4,7 +4,7 @@ from sqlalchemy import inspect, text
 def test_initial_schema_and_indexes(db_session) -> None:
     inspector = inspect(db_session.bind)
 
-    assert {"sources", "source_versions", "chunks", "citations", "ingest_jobs"}.issubset(
+    assert {"sources", "source_versions", "chunks", "citations", "ingest_jobs", "source_key_counters"}.issubset(
         set(inspector.get_table_names())
     )
 
@@ -20,7 +20,15 @@ def test_initial_schema_and_indexes(db_session) -> None:
 
 
 def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> None:
-    expected_tables = {"sources", "source_versions", "chunks", "citations", "ingest_jobs", "alembic_version"}
+    expected_tables = {
+        "sources",
+        "source_versions",
+        "chunks",
+        "citations",
+        "ingest_jobs",
+        "source_key_counters",
+        "alembic_version",
+    }
 
     table_comments = db_session.execute(
         text(
@@ -30,7 +38,7 @@ def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> 
             join pg_namespace n on n.oid = c.relnamespace
             where n.nspname = 'public'
               and c.relkind = 'r'
-              and c.relname in ('sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs', 'alembic_version')
+              and c.relname in ('sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs', 'source_key_counters', 'alembic_version')
             """
         )
     ).mappings().all()
@@ -43,7 +51,7 @@ def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> 
             join pg_attribute a on a.attrelid = c.oid
             where n.nspname = 'public'
               and c.relkind = 'r'
-              and c.relname in ('sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs', 'alembic_version')
+              and c.relname in ('sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs', 'source_key_counters', 'alembic_version')
               and a.attnum > 0
               and not a.attisdropped
             order by c.relname, a.attnum
@@ -178,9 +186,9 @@ def test_chunks_search_vector_is_database_generated(db_session) -> None:
         text(
             """
             insert into source_versions
-                (id, source_id, version_number, content_hash, source_format_code, normalized_format_code, file_path, raw_archive_path, status)
+                (id, source_id, version_number, content_hash, source_format_code, normalized_format_code, raw_archive_path, status)
             values
-                (:version_id, :source_id, 1, :content_hash, 1, 1, :file_path, :raw_archive_path, 'imported')
+                (:version_id, :source_id, 1, :content_hash, 1, 1, :raw_archive_path, 'imported')
             on conflict (source_id, content_hash) do nothing
             """
         ),
@@ -188,7 +196,6 @@ def test_chunks_search_vector_is_database_generated(db_session) -> None:
             "version_id": version_id,
             "source_id": source_id,
             "content_hash": "schema-hash",
-            "file_path": "tests/fixtures/schema.md",
             "raw_archive_path": "data/raw/document/schema-source/schema-version/schema.md",
         },
     )

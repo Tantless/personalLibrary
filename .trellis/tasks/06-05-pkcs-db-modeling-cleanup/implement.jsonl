@@ -1,0 +1,9 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verification gates for backend database PR"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Ingest validation and failure behavior"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Cross-layer backend service placement"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Path and privacy logging constraints"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Source identity redesign spans CLI service DB reader search docs"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse source metadata helpers for canonical key allocation"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Database schema and repository contracts for source identity redesign"}
