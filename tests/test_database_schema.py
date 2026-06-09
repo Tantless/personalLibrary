@@ -162,6 +162,27 @@ def test_enum_code_column_comments_include_int_mappings(db_session) -> None:
             assert "3:" in comment
 
 
+def test_source_key_counter_prefix_comment_lists_prefix_mappings(db_session) -> None:
+    comment = db_session.scalar(
+        text(
+            """
+            select col_description(c.oid, a.attnum) as comment
+            from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            join pg_attribute a on a.attrelid = c.oid
+            where n.nspname = 'public'
+              and c.relkind = 'r'
+              and c.relname = 'source_key_counters'
+              and a.attname = 'prefix'
+            """
+        )
+    )
+
+    assert comment is not None
+    for mapping in ["D:document", "A:ai_conversation", "W:wiki_article", "G:game_guide", "J:diary", "E:email"]:
+        assert mapping in comment
+
+
 def test_chunks_search_vector_is_database_generated(db_session) -> None:
     source_id = "schema-source"
     version_id = "schema-version"
