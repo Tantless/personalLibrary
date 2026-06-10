@@ -4,6 +4,10 @@
 
 将 Markdown 中穿插出现的表格和图片从普通文本 chunking 升级为 artifact-aware retrieval 设计：Raw Archive 保真保存原文和资源，表格/图片解析为结构化 artifact，再派生适合 BM25/FTS 和 embedding 的 retrieval chunks，并能在召回时回到原文上下文。
 
+## Scope Decision
+
+第一版只做 Markdown：只处理 Markdown table 和 Markdown image reference。PDF、HTML、docx 或其他格式解析出的表格/图片不进入本轮实现范围。
+
 ## What I Already Know
 
 * 当前 MVP parser 是 heading/line-based chunking：按 Markdown heading 分 section，再按字符/行切 chunk。
@@ -183,7 +187,7 @@ vision_summary
 
 ## Proposed Next Direction
 
-下一步不应直接接 embedding 或视觉模型，而应先实现 artifact-aware ingest skeleton。推荐 MVP 范围：
+下一步不应直接接 embedding 或视觉模型，而应先实现 Markdown-only artifact-aware ingest skeleton。推荐 MVP 范围：
 
 1. Markdown block parser：识别 heading/paragraph/list/code/table/image block，并保留 line locator。
 2. Artifact schema：新增 table/image artifact 表，建立 `chunks.artifact_type/artifact_id/chunk_kind` 或等价 metadata。
@@ -243,7 +247,7 @@ Codex/Claude Code 可作为 `agent-assisted enrichment` 的可选 provider，用
 
 ## Open Questions
 
-* 下一步实现是否只覆盖 Markdown table + Markdown image references，还是同时处理 HTML/PDF 解析后的表格/图片？推荐只覆盖 Markdown。
+* 暂无阻塞实现的问题。实现范围已确认：第一版只覆盖 Markdown table + Markdown image references。
 
 ## Acceptance Criteria
 
