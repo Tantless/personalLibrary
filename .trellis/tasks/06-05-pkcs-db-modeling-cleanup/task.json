@@ -3,7 +3,7 @@
   "name": "pkcs-db-modeling-cleanup",
   "title": "brainstorm: PKCS database modeling cleanup",
   "description": "Clarify and normalize PKCS MVP database modeling around file format, knowledge type, parser behavior, and integer-coded enum fields.",
-  "status": "planning",
+  "status": "completed",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "tantless",
   "assignee": "tantless",
   "createdAt": "2026-06-05",
-  "completedAt": null,
+  "completedAt": "2026-06-09",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 6,
   "next_action": [
     {
       "phase": 1,
@@ -42,12 +42,26 @@
       "action": "record-session"
     }
   ],
-  "commit": null,
+  "commit": "1160089,9799055,06f5532,31e889b",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": "06-03-pkcs-mvp-m1-m2",
-  "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "relatedFiles": [
+    "src/pkcs/source_metadata.py",
+    "src/pkcs/db/models.py",
+    "src/pkcs/ingest/service.py",
+    "migrations/versions/20260605_0005_split_source_type_codes.py",
+    "migrations/versions/20260608_0006_internal_source_identity.py",
+    "migrations/versions/20260609_0007_comment_source_key_prefix_mapping.py"
+  ],
+  "notes": "Completed database modeling cleanup: split source format, normalized format, and knowledge type; converted persisted enums to int code fields; removed original full input paths from durable identity; generated default canonical keys from DB counters; documented source key prefix mappings.",
+  "meta": {
+    "verification": [
+      "docker compose ps postgres",
+      "uv run alembic upgrade head",
+      "uv run pytest",
+      "git diff --check"
+    ]
+  }
 }

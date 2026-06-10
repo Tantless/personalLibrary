@@ -3,7 +3,7 @@
   "name": "pkcs-mvp-m1-m2",
   "title": "PKCS MVP: M1+M2 agent access and basic retrieval",
   "description": "Implement the first PKCS MVP by combining M1 and M2: MCP-first access, local HTTP support, raw archive, PostgreSQL metadata, AI conversation and Markdown/Web ingest, full-text search, read_source, and Context Pack v0.",
-  "status": "planning",
+  "status": "completed",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "tantless",
   "assignee": "tantless",
   "createdAt": "2026-06-03",
-  "completedAt": null,
+  "completedAt": "2026-06-09",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 6,
   "next_action": [
     {
       "phase": 1,
@@ -42,14 +42,26 @@
       "action": "record-session"
     }
   ],
-  "commit": null,
+  "commit": "9f249b3,9799055,06f5532,31e889b",
   "pr_url": null,
   "subtasks": [],
   "children": [
     "06-05-pkcs-db-modeling-cleanup"
   ],
   "parent": "06-03-pkcs-project-plan",
-  "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "relatedFiles": [
+    ".trellis/tasks/06-03-pkcs-mvp-m1-m2/prd.md",
+    ".trellis/tasks/06-03-pkcs-mvp-m1-m2/m1-m2-mvp-task-report.md",
+    ".trellis/tasks/06-03-pkcs-mvp-m1-m2/codex-cli-mcp-acceptance.md",
+    "README.md",
+    "tests/test_acceptance.py"
+  ],
+  "notes": "M1+M2 MVP is complete locally through PR7 and post-MVP database modeling cleanup. Core loop is implemented: ingest, Raw Archive, PostgreSQL chunks/citations, FTS search, read_source, Context Pack, CLI, HTTP health, and MCP tools. Real Codex CLI MCP acceptance is documented as the next manual validation step.",
+  "meta": {
+    "next_discussion": [
+      "Run real Codex CLI MCP acceptance against PKCS.",
+      "Decide M3 scope: retrieval orchestration, semantic retrieval, reranking, and Context Pack selection improvements.",
+      "Decide future knowledge types and additional ingest sources."
+    ]
+  }
 }

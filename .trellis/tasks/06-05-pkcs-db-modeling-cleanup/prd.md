@@ -110,7 +110,7 @@ Candidate fields:
 
 ## Implementation Result
 
-Initial split completed on 2026-06-05. Raw Archive source identity cleanup completed on 2026-06-08.
+Initial split completed on 2026-06-05. Raw Archive source identity cleanup completed on 2026-06-08. Source key prefix mapping comments completed on 2026-06-09.
 
 * Added `source_format_code`, `normalized_format_code`, and `knowledge_type_code` database modeling.
 * Replaced public `source_type` CLI/MCP/service contract with `knowledge_type`.
@@ -119,6 +119,7 @@ Initial split completed on 2026-06-05. Raw Archive source identity cleanup compl
 * Updated README, backend specs, AGENTS, tests, and MVP PRD references.
 * Removed persisted original full input paths from `sources`, `source_versions`, and `ingest_jobs`.
 * Added `source_key_counters` and generated default keys such as `D00001` and `A00001`.
+* Added schema comments documenting source key prefix mappings for `D` and `A`.
 * Ingest reports now expose `input_name` instead of the full original input path.
 * Added coverage proving Raw Archive read-back still works after deleting the original input file.
 

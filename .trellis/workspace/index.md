@@ -27,7 +27,7 @@ workspace/
 
 | Developer | Last Active | Sessions | Active File |
 |-----------|-------------|----------|-------------|
-| (none yet) | - | - | - |
+| tantless | 2026-06-09 | 1 | `journal-1.md` |
 
 ---
 

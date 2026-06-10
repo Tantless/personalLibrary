@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 3,
   "next_action": [
     {
       "phase": 1,
@@ -49,7 +49,21 @@
     "06-03-pkcs-mvp-m1-m2"
   ],
   "parent": null,
-  "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "relatedFiles": [
+    ".trellis/tasks/06-03-pkcs-project-plan/prd.md",
+    ".trellis/tasks/06-03-pkcs-mvp-m1-m2/prd.md",
+    ".trellis/tasks/06-03-pkcs-mvp-m1-m2/codex-cli-mcp-acceptance.md"
+  ],
+  "notes": "Overall PKCS planning remains active for M3-M5. M1+M2 MVP is complete locally and the database modeling cleanup child task is complete. The next concrete validation step is real Codex CLI MCP acceptance before expanding M3 scope.",
+  "meta": {
+    "completed_scope": [
+      "M1+M2 local MVP with ingest/search/read_source/context_pack via CLI, HTTP health, and MCP tools.",
+      "Database modeling cleanup for source format, normalized format, knowledge type, int enum fields, Raw Archive identity, and generated canonical keys."
+    ],
+    "future_scope": [
+      "M3 retrieval orchestration and Context Pack quality improvements.",
+      "Semantic retrieval, reranking, and additional knowledge type strategy.",
+      "Additional ingest sources such as PDF, docx, email, URL crawling, and code repositories."
+    ]
+  }
 }

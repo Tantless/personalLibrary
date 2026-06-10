@@ -375,6 +375,7 @@ Verified:
 Notes:
 
 * The MCP smoke test is the generic client fallback path. A real Codex MCP client smoke can be run later if local Codex MCP configuration is available.
+* Real Codex CLI MCP acceptance is documented in `.trellis/tasks/06-03-pkcs-mvp-m1-m2/codex-cli-mcp-acceptance.md`.
 * Eval tests use runtime-unique canonical key templates so persistent Docker test data does not affect acceptance results.
 
 ## Final Acceptance Procedure
