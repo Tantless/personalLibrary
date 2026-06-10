@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     http_host: str = "127.0.0.1"
     http_port: int = 8765
     database_url: str = "postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs"
+    test_database_url: str | None = None
     raw_archive_path: Path = Path("data/raw")
     default_top_k: int = Field(default=10, ge=1)
     ingest_chunk_max_chars: int = Field(default=2000, ge=200)

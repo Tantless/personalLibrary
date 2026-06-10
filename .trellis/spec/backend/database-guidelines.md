@@ -26,6 +26,7 @@ Configuration:
 
 ```env
 PKCS_DATABASE_URL=postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs
+PKCS_TEST_DATABASE_URL=postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs_test
 ```
 
 Repository constructors:
@@ -169,11 +170,23 @@ Transaction boundary:
 - Ingest may pass a pre-generated `version_id` to `create_version()` so Raw Archive paths can include `source_id/version_id` before the database row is inserted.
 - Default canonical key counters must be advanced inside the same caller-owned transaction.
 
+Pytest database isolation:
+
+- `tests/conftest.py` must never run integration tests against `PKCS_DATABASE_URL` directly.
+- The session-scoped `migrated_database_url` fixture derives a disposable database by appending `_test` to the configured application database name, for example `pkcs` -> `pkcs_test`.
+- `PKCS_TEST_DATABASE_URL` may override the derived URL. It is read through `Settings.test_database_url`, so both shell environment variables and `.env` work.
+- The test database name must end with `_test`, must not equal the application database name, and must not be `postgres`, `template0`, or `template1`.
+- At pytest session start, the fixture connects to the `postgres` maintenance database, drops the test database with `force`, recreates it, rewrites `PKCS_DATABASE_URL` to that test URL, clears `get_settings()`, then runs `alembic upgrade head`.
+- Tests may write temporary Raw Archive paths into the database; those rows must stay inside the disposable test database, not the development database.
+
 ### 4. Validation & Error Matrix
 
 | Case | Expected behavior | Required assertion |
 |------|-------------------|--------------------|
 | PostgreSQL unavailable | Integration tests skip with a clear pytest skip reason | `tests/conftest.py` connectivity gate |
+| Pytest starts with default local database URL | Tests use `pkcs_test`, not `pkcs` | `tests/test_database_isolation.py` asserts `current_database()` ends with `_test` |
+| `PKCS_TEST_DATABASE_URL` equals `PKCS_DATABASE_URL` | Test startup fails before drop/create | `tests/conftest.py` validation |
+| `PKCS_TEST_DATABASE_URL` points to `postgres`, `template0`, `template1`, or a name without `_test` | Test startup fails before drop/create | `tests/conftest.py` validation |
 | Duplicate `sources.canonical_key` | Database rejects the duplicate | Unique constraint remains present |
 | Duplicate `(source_id, content_hash)` | Database rejects duplicate source version content | `uq_source_versions_source_hash` remains present |
 | Duplicate `(version_id, chunk_index)` | Database rejects duplicate chunk order | `uq_chunks_version_chunk_index` remains present |
@@ -219,6 +232,7 @@ session.commit()
 Base:
 
 - Run `uv run alembic upgrade head` before database integration tests.
+- Let pytest manage its own disposable test database; do not point `PKCS_TEST_DATABASE_URL` at a development or manually curated database.
 - Use repositories for application writes; use direct SQL only in schema-focused tests.
 
 Bad:
@@ -228,9 +242,14 @@ chunk.search_vector = "manually generated value"
 session.commit()
 ```
 
+```env
+PKCS_TEST_DATABASE_URL=postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs
+```
+
 ### 6. Tests Required
 
 - `tests/test_database_schema.py`: table presence, required indexes, generated `search_vector`.
+- `tests/test_database_isolation.py`: pytest database URL and `current_database()` must point to a database whose name ends with `_test`.
 - `tests/test_database_schema.py`: table and column comments must be present for all PKCS public schema tables and use concise Chinese name-plus-explanation format.
 - `tests/test_database_schema.py`: foreign key column comments must include the referenced table and column.
 - `tests/test_repositories.py`: repository write/read behavior, including table/image artifact repositories, and caller-owned commit.
@@ -302,6 +321,20 @@ metadata_json={
 
 Do not parse `[Table tbl_001]` placeholder text to find objects.
 
+#### Wrong
+
+```env
+PKCS_TEST_DATABASE_URL=postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs
+```
+
+#### Correct
+
+```env
+PKCS_TEST_DATABASE_URL=postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs_test
+```
+
+Pytest owns this disposable database and may drop/recreate it at session startup.
+
 ---
 
 ## Common Mistakes
@@ -317,3 +350,4 @@ Do not parse `[Table tbl_001]` placeholder text to find objects.
 - Reading current source files instead of Raw Archive in `read_source`; this breaks version traceability.
 - Building Context Pack evidence directly from snippets only; snippets are not enough for read-back traceability.
 - Treating Markdown artifact placeholders as durable links. They are display text; `metadata_json.artifact_id` is the durable link.
+- Running pytest against the development database. Temporary Raw Archive paths and synthetic fixtures belong only in the disposable `_test` database.
