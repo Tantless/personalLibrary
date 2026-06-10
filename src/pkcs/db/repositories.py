@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pkcs.db.models import Chunk, Citation, IngestJob, Source, SourceKeyCounter, SourceVersion
+from pkcs.db.models import Chunk, Citation, ImageArtifact, IngestJob, Source, SourceKeyCounter, SourceVersion, TableArtifact
 
 
 class SourceKeyCounterRepository:
@@ -197,6 +197,96 @@ class CitationRepository:
         self.session.add(citation)
         self.session.flush()
         return citation
+
+
+class TableArtifactRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def create_table_artifact(
+        self,
+        *,
+        source_id: str,
+        version_id: str,
+        artifact_key: str,
+        locator: str,
+        line_start: int,
+        line_end: int,
+        columns: list[str],
+        rows: list[dict[str, str]],
+        normalized_markdown: str,
+        heading_path: list[str] | None = None,
+        summary: str | None = None,
+        metadata_json: dict[str, Any] | None = None,
+    ) -> TableArtifact:
+        artifact = TableArtifact(
+            source_id=source_id,
+            version_id=version_id,
+            artifact_key=artifact_key,
+            locator=locator,
+            line_start=line_start,
+            line_end=line_end,
+            heading_path=heading_path or [],
+            column_names=columns,
+            rows=rows,
+            normalized_markdown=normalized_markdown,
+            summary=summary,
+            metadata_json=metadata_json or {},
+        )
+        self.session.add(artifact)
+        self.session.flush()
+        return artifact
+
+    def get(self, artifact_id: str) -> TableArtifact | None:
+        return self.session.get(TableArtifact, artifact_id)
+
+
+class ImageArtifactRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def create_image_artifact(
+        self,
+        *,
+        source_id: str,
+        version_id: str,
+        artifact_key: str,
+        locator: str,
+        line_start: int,
+        line_end: int,
+        original_uri: str,
+        heading_path: list[str] | None = None,
+        asset_path: str | None = None,
+        alt_text: str | None = None,
+        caption: str | None = None,
+        nearby_text: str | None = None,
+        ocr_text: str | None = None,
+        vision_summary: str | None = None,
+        metadata_json: dict[str, Any] | None = None,
+    ) -> ImageArtifact:
+        artifact = ImageArtifact(
+            source_id=source_id,
+            version_id=version_id,
+            artifact_key=artifact_key,
+            locator=locator,
+            line_start=line_start,
+            line_end=line_end,
+            heading_path=heading_path or [],
+            original_uri=original_uri,
+            asset_path=asset_path,
+            alt_text=alt_text,
+            caption=caption,
+            nearby_text=nearby_text,
+            ocr_text=ocr_text,
+            vision_summary=vision_summary,
+            metadata_json=metadata_json or {},
+        )
+        self.session.add(artifact)
+        self.session.flush()
+        return artifact
+
+    def get(self, artifact_id: str) -> ImageArtifact | None:
+        return self.session.get(ImageArtifact, artifact_id)
 
 
 class IngestJobRepository:

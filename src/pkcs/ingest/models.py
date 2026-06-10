@@ -34,6 +34,39 @@ class ParsedChunk:
     line_end: int
     heading_path: list[str] = field(default_factory=list)
     metadata_json: dict[str, Any] = field(default_factory=dict)
+    chunk_key: str | None = None
+
+    @property
+    def locator(self) -> str:
+        return f"line {self.line_start}-{self.line_end}"
+
+
+@dataclass(frozen=True)
+class ParsedTableArtifact:
+    artifact_key: str
+    line_start: int
+    line_end: int
+    heading_path: list[str]
+    columns: list[str]
+    rows: list[dict[str, str]]
+    normalized_markdown: str
+    summary: str | None = None
+
+    @property
+    def locator(self) -> str:
+        return f"line {self.line_start}-{self.line_end}"
+
+
+@dataclass(frozen=True)
+class ParsedImageArtifact:
+    artifact_key: str
+    line_start: int
+    line_end: int
+    heading_path: list[str]
+    original_uri: str
+    alt_text: str | None = None
+    caption: str | None = None
+    nearby_text: str | None = None
 
     @property
     def locator(self) -> str:
@@ -46,6 +79,8 @@ class ParsedSource:
     knowledge_type: str
     metadata_json: dict[str, Any]
     chunks: list[ParsedChunk]
+    table_artifacts: list[ParsedTableArtifact] = field(default_factory=list)
+    image_artifacts: list[ParsedImageArtifact] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -105,6 +140,8 @@ __all__ = [
     "IngestItemReport",
     "IngestReport",
     "ParsedChunk",
+    "ParsedImageArtifact",
     "ParsedSource",
+    "ParsedTableArtifact",
     "source_format_name",
 ]

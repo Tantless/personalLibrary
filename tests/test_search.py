@@ -133,6 +133,32 @@ def test_search_no_results_returns_empty_list(db_session) -> None:
     assert response.results == []
 
 
+def test_search_can_return_markdown_table_artifact_chunk(db_session, tmp_path) -> None:
+    token = f"artifactterm{uuid4().hex}"
+    source_path = tmp_path / "table-search.md"
+    source_path.write_text(
+        "# Table Search\n\n"
+        "| Component | Detail |\n"
+        "| --- | --- |\n"
+        f"| Retriever | {token} only appears in the table row |\n",
+        encoding="utf-8",
+    )
+    make_ingest_service(db_session, tmp_path / "raw").ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:table-search-{token}",
+    )
+
+    response = make_search_service(db_session).search_knowledge(query=token, top_k=5)
+
+    table_results = [result for result in response.results if result.metadata.get("chunk_kind") == "table_rows"]
+    assert table_results
+    assert table_results[0].metadata["artifact_type"] == "table"
+    assert table_results[0].metadata["artifact_key"] == "tbl_001"
+    assert table_results[0].metadata["artifact_id"]
+    assert table_results[0].metadata["parent_narrative_chunk_id"]
+
+
 def test_cli_search_command_outputs_response(monkeypatch, migrated_database_url, tmp_path) -> None:
     suffix = uuid4().hex
     source_path = tmp_path / "cli-search.md"

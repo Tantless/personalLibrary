@@ -12,9 +12,11 @@ from pkcs.db.models import IngestJob, new_id
 from pkcs.db.repositories import (
     ChunkRepository,
     CitationRepository,
+    ImageArtifactRepository,
     IngestJobRepository,
     SourceKeyCounterRepository,
     SourceRepository,
+    TableArtifactRepository,
 )
 from pkcs.db.session import create_session_factory
 from pkcs.ingest.models import (
@@ -22,6 +24,7 @@ from pkcs.ingest.models import (
     SUPPORTED_KNOWLEDGE_TYPES,
     IngestItemReport,
     IngestReport,
+    ParsedSource,
 )
 from pkcs.ingest.parsers import IngestParseError, parse_source_file
 from pkcs.source_metadata import (
@@ -248,9 +251,34 @@ class IngestService:
             },
         )
 
+        table_artifacts_by_key = self._create_table_artifacts(
+            session=session,
+            parsed=parsed,
+            source_id=source.id,
+            version_id=version.id,
+        )
+        image_artifacts_by_key = self._create_image_artifacts(
+            session=session,
+            parsed=parsed,
+            source_id=source.id,
+            version_id=version.id,
+            source_path=resolved_path,
+            knowledge_type=knowledge_type,
+        )
+        artifacts_by_type_and_key = {
+            "table": table_artifacts_by_key,
+            "image": image_artifacts_by_key,
+        }
+
         chunk_repo = ChunkRepository(session)
         citation_repo = CitationRepository(session)
+        chunk_ids_by_key: dict[str, str] = {}
         for index, parsed_chunk in enumerate(parsed.chunks):
+            chunk_metadata = self._chunk_metadata_with_artifact_refs(
+                metadata_json=parsed_chunk.metadata_json,
+                artifacts_by_type_and_key=artifacts_by_type_and_key,
+                chunk_ids_by_key=chunk_ids_by_key,
+            )
             chunk = chunk_repo.create_chunk(
                 source_id=source.id,
                 version_id=version.id,
@@ -264,8 +292,10 @@ class IngestService:
                 line_end=parsed_chunk.line_end,
                 content=parsed_chunk.content,
                 heading_path=parsed_chunk.heading_path,
-                metadata_json=parsed_chunk.metadata_json,
+                metadata_json=chunk_metadata,
             )
+            if parsed_chunk.chunk_key is not None:
+                chunk_ids_by_key[parsed_chunk.chunk_key] = chunk.id
             citation_repo.create_citation(
                 source_id=source.id,
                 version_id=version.id,
@@ -274,7 +304,7 @@ class IngestService:
                 line_start=parsed_chunk.line_start,
                 line_end=parsed_chunk.line_end,
                 quote=parsed_chunk.content[:1000],
-                metadata_json=parsed_chunk.metadata_json,
+                metadata_json=chunk_metadata,
             )
 
         return IngestItemReport(
@@ -288,6 +318,147 @@ class IngestService:
             created_new_version=True,
             chunks_created=len(parsed.chunks),
         )
+
+    def _create_table_artifacts(
+        self,
+        *,
+        session: Session,
+        parsed: ParsedSource,
+        source_id: str,
+        version_id: str,
+    ) -> dict[str, str]:
+        table_repo = TableArtifactRepository(session)
+        artifacts_by_key: dict[str, str] = {}
+        for artifact in parsed.table_artifacts:
+            row = table_repo.create_table_artifact(
+                source_id=source_id,
+                version_id=version_id,
+                artifact_key=artifact.artifact_key,
+                locator=artifact.locator,
+                line_start=artifact.line_start,
+                line_end=artifact.line_end,
+                heading_path=artifact.heading_path,
+                columns=artifact.columns,
+                rows=artifact.rows,
+                normalized_markdown=artifact.normalized_markdown,
+                summary=artifact.summary,
+                metadata_json={"artifact_key": artifact.artifact_key, "artifact_type": "table"},
+            )
+            artifacts_by_key[artifact.artifact_key] = row.id
+        return artifacts_by_key
+
+    def _create_image_artifacts(
+        self,
+        *,
+        session: Session,
+        parsed: ParsedSource,
+        source_id: str,
+        version_id: str,
+        source_path: Path,
+        knowledge_type: str,
+    ) -> dict[str, str]:
+        image_repo = ImageArtifactRepository(session)
+        artifacts_by_key: dict[str, str] = {}
+        for artifact in parsed.image_artifacts:
+            asset_path = self._archive_image_asset(
+                knowledge_type=knowledge_type,
+                source_id=source_id,
+                version_id=version_id,
+                artifact_key=artifact.artifact_key,
+                source_path=source_path,
+                original_uri=artifact.original_uri,
+            )
+            row = image_repo.create_image_artifact(
+                source_id=source_id,
+                version_id=version_id,
+                artifact_key=artifact.artifact_key,
+                locator=artifact.locator,
+                line_start=artifact.line_start,
+                line_end=artifact.line_end,
+                heading_path=artifact.heading_path,
+                original_uri=artifact.original_uri,
+                asset_path=asset_path,
+                alt_text=artifact.alt_text,
+                caption=artifact.caption,
+                nearby_text=artifact.nearby_text,
+                metadata_json={
+                    "artifact_key": artifact.artifact_key,
+                    "artifact_type": "image",
+                    "asset_copied": asset_path is not None,
+                },
+            )
+            artifacts_by_key[artifact.artifact_key] = row.id
+        return artifacts_by_key
+
+    def _archive_image_asset(
+        self,
+        *,
+        knowledge_type: str,
+        source_id: str,
+        version_id: str,
+        artifact_key: str,
+        source_path: Path,
+        original_uri: str,
+    ) -> str | None:
+        if self._is_remote_or_data_uri(original_uri):
+            return None
+        candidate = Path(original_uri)
+        if not candidate.is_absolute():
+            candidate = source_path.parent / candidate
+        if not candidate.exists() or not candidate.is_file():
+            return None
+        return self.raw_archive_writer.write_asset(
+            knowledge_type=knowledge_type,
+            source_id=source_id,
+            version_id=version_id,
+            artifact_key=artifact_key,
+            original_path=candidate,
+        ).as_posix()
+
+    def _chunk_metadata_with_artifact_refs(
+        self,
+        *,
+        metadata_json: dict[str, Any],
+        artifacts_by_type_and_key: dict[str, dict[str, str]],
+        chunk_ids_by_key: dict[str, str],
+    ) -> dict[str, Any]:
+        metadata = dict(metadata_json)
+        if "linked_artifacts" in metadata:
+            metadata["linked_artifacts"] = [
+                self._artifact_ref_with_id(ref, artifacts_by_type_and_key)
+                for ref in metadata["linked_artifacts"]
+            ]
+
+        artifact_type = metadata.get("artifact_type")
+        artifact_key = metadata.get("artifact_key")
+        if isinstance(artifact_type, str) and isinstance(artifact_key, str):
+            artifact_id = artifacts_by_type_and_key.get(artifact_type, {}).get(artifact_key)
+            if artifact_id is not None:
+                metadata["artifact_id"] = artifact_id
+
+        parent_key = metadata.get("parent_narrative_chunk_key")
+        if isinstance(parent_key, str):
+            parent_id = chunk_ids_by_key.get(parent_key)
+            if parent_id is not None:
+                metadata["parent_narrative_chunk_id"] = parent_id
+        return metadata
+
+    def _artifact_ref_with_id(
+        self,
+        ref: dict[str, Any],
+        artifacts_by_type_and_key: dict[str, dict[str, str]],
+    ) -> dict[str, Any]:
+        resolved = dict(ref)
+        artifact_type = resolved.get("artifact_type")
+        artifact_key = resolved.get("artifact_key")
+        if isinstance(artifact_type, str) and isinstance(artifact_key, str):
+            artifact_id = artifacts_by_type_and_key.get(artifact_type, {}).get(artifact_key)
+            if artifact_id is not None:
+                resolved["artifact_id"] = artifact_id
+        return resolved
+
+    def _is_remote_or_data_uri(self, value: str) -> bool:
+        return "://" in value or value.startswith(("data:", "mailto:"))
 
     def _resolve_input_files(
         self,

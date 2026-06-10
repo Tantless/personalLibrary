@@ -145,6 +145,40 @@ def test_context_pack_no_results_returns_empty_evidence_with_caveats(db_session)
     assert "## Conflicts / Caveats" in response.context_pack_markdown
 
 
+def test_context_pack_hydrates_linked_markdown_artifacts(db_session, tmp_path) -> None:
+    token = uuid4().hex
+    asset_dir = tmp_path / "assets"
+    asset_dir.mkdir()
+    (asset_dir / "flow.png").write_bytes(b"fake-image")
+    source_path = tmp_path / "artifacts.md"
+    source_path.write_text(
+        "# Artifact Context\n\n"
+        f"{token} introduces a retrieval artifact set.\n\n"
+        "| Stage | Output |\n"
+        "| --- | --- |\n"
+        "| Search | Candidate chunks |\n\n"
+        "![Retrieval flow](assets/flow.png)\n",
+        encoding="utf-8",
+    )
+    make_ingest_service(db_session, tmp_path / "raw").ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:context-artifacts-{token}",
+    )
+    service = make_context_service(db_session)
+
+    response = service.get_context_pack(query=token, top_k=1)
+
+    assert len(response.evidence) == 1
+    content = response.evidence[0].content
+    assert "Linked Artifacts:" in content
+    assert "Table tbl_001" in content
+    assert "Columns: Stage, Output; rows: 1" in content
+    assert "Image img_001" in content
+    assert "Retrieval flow" in content
+    assert "Asset:" in content
+
+
 def test_cli_context_pack_command_outputs_response(monkeypatch, migrated_database_url, tmp_path) -> None:
     token = uuid4().hex
     source_path = tmp_path / "cli-context.md"

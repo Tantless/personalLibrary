@@ -19,3 +19,19 @@ class RawArchiveWriter:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(content)
         return destination
+
+    def write_asset(
+        self,
+        *,
+        knowledge_type: str,
+        source_id: str,
+        version_id: str,
+        artifact_key: str,
+        original_path: Path | str,
+    ) -> Path:
+        source_path = Path(original_path)
+        filename = f"{artifact_key}-{source_path.name or 'asset'}"
+        destination = self.root / knowledge_type / source_id / version_id / "assets" / filename
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source_path.read_bytes())
+        return destination

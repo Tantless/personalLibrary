@@ -8,6 +8,8 @@ from pkcs.context_pack.models import (
     ContextPackSource,
     FollowupReadSuggestion,
 )
+from pkcs.db.models import ImageArtifact, TableArtifact
+from pkcs.db.repositories import ImageArtifactRepository, TableArtifactRepository
 from pkcs.reader import ReadSourceService
 from pkcs.search import SearchService
 from pkcs.search.models import SearchResult
@@ -131,6 +133,7 @@ class ContextPackService:
         evidence: list[ContextPackEvidence] = []
         for index, result in enumerate(results, start=1):
             fragment = self.read_source_service.read_source(chunk_id=result.chunk_id)
+            content = self._hydrate_artifacts(content=fragment.content, metadata=result.metadata)
             evidence.append(
                 ContextPackEvidence(
                     evidence_id=f"evidence-{index}",
@@ -147,11 +150,86 @@ class ContextPackService:
                     line_end=result.citation.line_end,
                     score=result.score,
                     snippet=result.snippet,
-                    content=fragment.content,
+                    content=content,
                     metadata=result.metadata,
                 )
             )
         return evidence
+
+    def _hydrate_artifacts(self, *, content: str, metadata: dict) -> str:
+        artifact_lines = self._artifact_chunk_lines(metadata)
+        linked_lines = self._linked_artifact_lines(metadata)
+        if not artifact_lines and not linked_lines:
+            return content
+
+        sections = [content]
+        if artifact_lines:
+            sections.extend(["", "Artifact Details:", *artifact_lines])
+        if linked_lines:
+            sections.extend(["", "Linked Artifacts:", *linked_lines])
+        return "\n".join(sections)
+
+    def _artifact_chunk_lines(self, metadata: dict) -> list[str]:
+        artifact_type = metadata.get("artifact_type")
+        artifact_id = metadata.get("artifact_id")
+        if not isinstance(artifact_type, str) or not isinstance(artifact_id, str):
+            return []
+
+        with self.read_source_service.session_factory() as session:
+            if artifact_type == "table":
+                artifact = TableArtifactRepository(session).get(artifact_id)
+                if artifact is None:
+                    return []
+                return self._table_artifact_lines(artifact)
+            if artifact_type == "image":
+                artifact = ImageArtifactRepository(session).get(artifact_id)
+                if artifact is None:
+                    return []
+                return self._image_artifact_lines(artifact)
+        return []
+
+    def _linked_artifact_lines(self, metadata: dict) -> list[str]:
+        linked_artifacts = metadata.get("linked_artifacts")
+        if not isinstance(linked_artifacts, list) or not linked_artifacts:
+            return []
+
+        artifact_lines: list[str] = []
+        with self.read_source_service.session_factory() as session:
+            table_repo = TableArtifactRepository(session)
+            image_repo = ImageArtifactRepository(session)
+            for ref in linked_artifacts:
+                if not isinstance(ref, dict):
+                    continue
+                artifact_type = ref.get("artifact_type")
+                artifact_id = ref.get("artifact_id")
+                if not isinstance(artifact_id, str):
+                    continue
+                if artifact_type == "table":
+                    artifact = table_repo.get(artifact_id)
+                    if artifact is None:
+                        continue
+                    artifact_lines.extend(self._table_artifact_lines(artifact))
+                elif artifact_type == "image":
+                    artifact = image_repo.get(artifact_id)
+                    if artifact is None:
+                        continue
+                    artifact_lines.extend(self._image_artifact_lines(artifact))
+        return artifact_lines
+
+    def _table_artifact_lines(self, artifact: TableArtifact) -> list[str]:
+        return [
+            f"- Table {artifact.artifact_key} ({artifact.locator}): {artifact.summary or 'Markdown table'}",
+            f"  Columns: {', '.join(artifact.column_names)}; rows: {len(artifact.rows)}",
+        ]
+
+    def _image_artifact_lines(self, artifact: ImageArtifact) -> list[str]:
+        description = artifact.alt_text or artifact.caption or artifact.original_uri
+        lines = [f"- Image {artifact.artifact_key} ({artifact.locator}): {description}"]
+        if artifact.asset_path:
+            lines.append(f"  Asset: {artifact.asset_path}")
+        if artifact.nearby_text:
+            lines.append(f"  Nearby: {artifact.nearby_text}")
+        return lines
 
     def _build_sources(self, evidence: list[ContextPackEvidence]) -> list[ContextPackSource]:
         source_counts = Counter(item.source_id for item in evidence)

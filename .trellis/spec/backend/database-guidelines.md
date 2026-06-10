@@ -35,6 +35,8 @@ SourceRepository(session: Session)
 SourceKeyCounterRepository(session: Session)
 ChunkRepository(session: Session)
 CitationRepository(session: Session)
+TableArtifactRepository(session: Session)
+ImageArtifactRepository(session: Session)
 IngestJobRepository(session: Session)
 ```
 
@@ -52,6 +54,10 @@ ChunkRepository.create_chunk(source_id, version_id, chunk_index, title, source_f
 ChunkRepository.get(chunk_id)
 ChunkRepository.get_by_locator(source_id, version_id, locator)
 CitationRepository.create_citation(source_id, version_id, chunk_id, locator, line_start, line_end, quote=None, metadata_json=None)
+TableArtifactRepository.create_table_artifact(source_id, version_id, artifact_key, locator, line_start, line_end, columns, rows, normalized_markdown, ...)
+TableArtifactRepository.get(artifact_id)
+ImageArtifactRepository.create_image_artifact(source_id, version_id, artifact_key, locator, line_start, line_end, original_uri, ...)
+ImageArtifactRepository.get(artifact_id)
 IngestJobRepository.create_job(knowledge_type_code, input_name, status="started", summary_json=None)
 IngestJobRepository.finish_job(job, status, summary_json, error_message=None)
 ```
@@ -88,6 +94,8 @@ Core tables:
 - `citations`: source/version/chunk-linked evidence references for future `read_source` and Context Pack output.
 - `ingest_jobs`: MVP audit surface for ingest status and per-run summaries; stores `input_name`, not the original full input path.
 - `source_key_counters`: transactional counters for generated default `canonical_key` values such as `D00001` and `A00001`.
+- `table_artifacts`: Markdown-only table objects; stores `artifact_key`, locator fields, `heading_path`, `columns`, `rows`, `normalized_markdown`, optional `summary`, and metadata. `(version_id, artifact_key)` is unique.
+- `image_artifacts`: Markdown-only image objects; stores `artifact_key`, locator fields, `heading_path`, `original_uri`, optional Raw Archive `asset_path`, `alt_text`, `caption`, `nearby_text`, future `ocr_text`, future `vision_summary`, and metadata. `(version_id, artifact_key)` is unique.
 
 Source identity:
 
@@ -122,8 +130,17 @@ Context Pack:
 - Context Pack must call `SearchService` for candidate evidence and `ReadSourceService` for source fragments.
 - Every Context Pack evidence item must carry `chunk_id`, `source_id`, `version_id`, `canonical_key`, `locator`, `line_start`, and `line_end`.
 - Evidence selection is search top_k plus chunk deduplication and per-source evidence cap.
+- If a narrative chunk has `metadata_json.linked_artifacts`, Context Pack may hydrate Level 1 artifact summaries by resolving `artifact_type + artifact_id` through the artifact repositories.
+- If an artifact-derived chunk has `metadata_json.artifact_type` and `metadata_json.artifact_id`, Context Pack may append object details while preserving the Raw Archive fragment returned by `ReadSourceService`.
 - `budget_tokens` only affects `context_pack_markdown`; it is a soft hint and not an exact tokenizer guarantee.
 - `context_pack_markdown` must include `Conflicts / Caveats` and state that real conflict detection is not performed in MVP.
+
+Markdown artifact chunk metadata:
+
+- `chunk_kind="narrative"` chunks may include `linked_artifacts`, where each item carries `artifact_type`, `artifact_key`, `artifact_id`, `locator`, and `role`.
+- Table derived chunks use `chunk_kind="table_summary"` or `chunk_kind="table_rows"` plus `artifact_type="table"`, `artifact_key`, `artifact_id`, `artifact_locator`, and `parent_narrative_chunk_id`.
+- Image derived chunks use `chunk_kind="image_summary"` plus `artifact_type="image"`, `artifact_key`, `artifact_id`, `artifact_locator`, and `parent_narrative_chunk_id`.
+- Placeholder text such as `[Table tbl_001: ...]` is readability-only. Code must use `metadata_json` and artifact table primary keys for reliable linking.
 
 Full-text search:
 
@@ -160,6 +177,7 @@ Transaction boundary:
 | Duplicate `sources.canonical_key` | Database rejects the duplicate | Unique constraint remains present |
 | Duplicate `(source_id, content_hash)` | Database rejects duplicate source version content | `uq_source_versions_source_hash` remains present |
 | Duplicate `(version_id, chunk_index)` | Database rejects duplicate chunk order | `uq_chunks_version_chunk_index` remains present |
+| Duplicate `(version_id, artifact_key)` for table/image artifacts | Database rejects duplicate object numbering inside one version | `uq_table_artifacts_version_key` / `uq_image_artifacts_version_key` remain present |
 | Missing explicit canonical key | Application generates prefix + five-digit key from `source_key_counters` | Ingest test asserts key shape |
 | Original input file deleted after ingest | `read_source` still reads evidence from Raw Archive | Ingest or reader test unlinks input file and reads by chunk |
 | Insert chunk without `search_vector` | Database generates `search_vector` | `test_chunks_search_vector_is_database_generated` |
@@ -172,6 +190,7 @@ Transaction boundary:
 | Read by source/version/locator | Returns the requested line range plus optional context | Reader tests use `line 4-4` with `context_lines=1` |
 | Invalid locator | Raises reader input error | Reader tests assert invalid locator failure |
 | Context Pack evidence selected | Each item maps back to `read_source(chunk_id=...)` | Context Pack tests compare evidence content with read_source |
+| Context Pack evidence references Markdown artifacts | Evidence content includes hydrated artifact details without losing source refs | Context Pack artifact hydration test |
 | Multiple adjacent chunks from one source | Per-source cap limits source dominance | Context Pack tests assert per-source cap |
 | Soft budget set | Markdown gets shorter but structured evidence remains traceable | Context Pack budget test |
 | Table or column exists in public schema | PostgreSQL comment is present, non-empty, and formatted as `<中文名>：<一句话解释>` | Schema test queries `obj_description` and `col_description` |
@@ -214,10 +233,10 @@ session.commit()
 - `tests/test_database_schema.py`: table presence, required indexes, generated `search_vector`.
 - `tests/test_database_schema.py`: table and column comments must be present for all PKCS public schema tables and use concise Chinese name-plus-explanation format.
 - `tests/test_database_schema.py`: foreign key column comments must include the referenced table and column.
-- `tests/test_repositories.py`: repository write/read behavior and caller-owned commit.
+- `tests/test_repositories.py`: repository write/read behavior, including table/image artifact repositories, and caller-owned commit.
 - `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
-- `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, generated canonical keys, Raw Archive read-back after input deletion, and ingest job summaries.
-- `tests/test_search.py`: PostgreSQL FTS query, title boost, filters, top_k, no-results, and interface smoke tests.
+- `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, generated canonical keys, Raw Archive read-back after input deletion, Markdown table/image artifacts, asset copying, and ingest job summaries.
+- `tests/test_search.py`: PostgreSQL FTS query, title boost, filters, top_k, no-results, artifact-derived chunk retrieval, and interface smoke tests.
 - `tests/test_reader.py`: `chunk_id`, source/version/locator, `context_lines`, invalid locator, CLI, and MCP.
 - `tests/test_context_pack.py`: evidence caps, per-source limit, budget, caveats, read_source mapping, CLI, and MCP.
 - Full PR-sized database changes must run `uv run pytest` with Docker PostgreSQL healthy.
@@ -270,6 +289,19 @@ fragment = read_source_service.read_source(chunk_id=result.chunk_id)
 
 Do not put evidence content into a Context Pack without refs that can be read back.
 
+Markdown artifact linking must use metadata and primary keys:
+
+```python
+metadata_json={
+    "chunk_kind": "narrative",
+    "linked_artifacts": [
+        {"artifact_type": "table", "artifact_key": "tbl_001", "artifact_id": table.id}
+    ],
+}
+```
+
+Do not parse `[Table tbl_001]` placeholder text to find objects.
+
 ---
 
 ## Common Mistakes
@@ -284,3 +316,4 @@ Do not put evidence content into a Context Pack without refs that can be read ba
 - Writing optional PostgreSQL filter clauses as `:knowledge_type_code is null`; cast nullable params with `cast(:knowledge_type_code as integer)` so PostgreSQL can infer the type.
 - Reading current source files instead of Raw Archive in `read_source`; this breaks version traceability.
 - Building Context Pack evidence directly from snippets only; snippets are not enough for read-back traceability.
+- Treating Markdown artifact placeholders as durable links. They are display text; `metadata_json.artifact_id` is the durable link.

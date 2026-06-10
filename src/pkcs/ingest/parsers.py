@@ -8,7 +8,9 @@ from pkcs.ingest.models import (
     KNOWLEDGE_TYPE_NAME_AI_CONVERSATION,
     KNOWLEDGE_TYPE_NAME_DOCUMENT,
     ParsedChunk,
+    ParsedImageArtifact,
     ParsedSource,
+    ParsedTableArtifact,
 )
 
 
@@ -22,6 +24,14 @@ class _Section:
     heading_path: list[str]
     line_start: int
     lines: list[str]
+
+
+@dataclass(frozen=True)
+class _RenderedEntry:
+    text: str
+    line_start: int
+    line_end: int
+    linked_artifact: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -41,6 +51,8 @@ class _TurnWindow:
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _SPEAKER_RE = re.compile(r"^([A-Za-z][A-Za-z0-9 _.-]{0,40}):\s*(.*)$")
+_IMAGE_LINE_RE = re.compile(r"^\s*!\[([^\]]*)\]\((.+?)\)\s*$")
+_TABLE_SEPARATOR_CELL_RE = re.compile(r"^:?-{3,}:?$")
 
 
 def parse_source_file(
@@ -76,18 +88,24 @@ def _parse_document_source(*, path: Path, text: str, max_chars: int, overlap_lin
     if path.suffix.lower() == ".txt":
         title = _safe_title(_first_nonblank(lines) or path.stem)
         sections = [_Section(title=title, heading_path=[], line_start=1, lines=lines)]
+        chunks: list[ParsedChunk] = []
+        for section in sections:
+            chunks.extend(
+                _chunks_from_section(
+                    section=section,
+                    knowledge_type=KNOWLEDGE_TYPE_NAME_DOCUMENT,
+                    max_chars=max_chars,
+                    overlap_lines=overlap_lines,
+                )
+            )
+        table_artifacts: list[ParsedTableArtifact] = []
+        image_artifacts: list[ParsedImageArtifact] = []
     else:
         title, sections = _markdown_sections(path=path, lines=lines)
-
-    chunks: list[ParsedChunk] = []
-    for section in sections:
-        chunks.extend(
-            _chunks_from_section(
-                section=section,
-                knowledge_type=KNOWLEDGE_TYPE_NAME_DOCUMENT,
-                max_chars=max_chars,
-                overlap_lines=overlap_lines,
-            )
+        chunks, table_artifacts, image_artifacts = _chunks_from_markdown_sections(
+            sections=sections,
+            max_chars=max_chars,
+            overlap_lines=overlap_lines,
         )
 
     if not chunks:
@@ -101,6 +119,8 @@ def _parse_document_source(*, path: Path, text: str, max_chars: int, overlap_lin
             "line_count": len(lines),
         },
         chunks=chunks,
+        table_artifacts=table_artifacts,
+        image_artifacts=image_artifacts,
     )
 
 
@@ -178,6 +198,426 @@ def _chunks_from_section(
             )
         )
     return chunks
+
+
+def _chunks_from_markdown_sections(
+    *,
+    sections: list[_Section],
+    max_chars: int,
+    overlap_lines: int,
+) -> tuple[list[ParsedChunk], list[ParsedTableArtifact], list[ParsedImageArtifact]]:
+    narrative_chunks: list[ParsedChunk] = []
+    table_artifacts: list[ParsedTableArtifact] = []
+    image_artifacts: list[ParsedImageArtifact] = []
+    table_count = 0
+    image_count = 0
+
+    for section in sections:
+        entries: list[_RenderedEntry] = []
+        index = 0
+        in_fence = False
+        fence_marker: str | None = None
+
+        while index < len(section.lines):
+            line = section.lines[index]
+            absolute_line = section.line_start + index
+            fence = _fence_marker(line)
+            if fence is not None:
+                if in_fence and fence == fence_marker:
+                    in_fence = False
+                    fence_marker = None
+                elif not in_fence:
+                    in_fence = True
+                    fence_marker = fence
+                entries.append(_RenderedEntry(text=line, line_start=absolute_line, line_end=absolute_line))
+                index += 1
+                continue
+
+            if not in_fence:
+                table_end = _table_end_index(section.lines, index)
+                if table_end is not None:
+                    table_count += 1
+                    artifact_key = f"tbl_{table_count:03d}"
+                    table_lines = section.lines[index : table_end + 1]
+                    line_end = section.line_start + table_end
+                    columns, rows = _parse_table(table_lines)
+                    normalized_markdown = _normalized_table_markdown(columns, rows)
+                    artifact = ParsedTableArtifact(
+                        artifact_key=artifact_key,
+                        line_start=absolute_line,
+                        line_end=line_end,
+                        heading_path=section.heading_path,
+                        columns=columns,
+                        rows=rows,
+                        normalized_markdown=normalized_markdown,
+                        summary=_table_summary(columns=columns, rows=rows),
+                    )
+                    table_artifacts.append(artifact)
+                    entries.append(
+                        _RenderedEntry(
+                            text=_table_placeholder(artifact),
+                            line_start=artifact.line_start,
+                            line_end=artifact.line_end,
+                            linked_artifact=_linked_artifact("table", artifact.artifact_key, artifact.locator),
+                        )
+                    )
+                    index = table_end + 1
+                    continue
+
+                image_match = _IMAGE_LINE_RE.match(line)
+                if image_match:
+                    image_count += 1
+                    artifact_key = f"img_{image_count:03d}"
+                    original_uri = _parse_image_uri(image_match.group(2))
+                    artifact = ParsedImageArtifact(
+                        artifact_key=artifact_key,
+                        line_start=absolute_line,
+                        line_end=absolute_line,
+                        heading_path=section.heading_path,
+                        original_uri=original_uri,
+                        alt_text=_optional_str(image_match.group(1)),
+                        nearby_text=_nearby_text_for_image(entries=entries, lines=section.lines, image_index=index),
+                    )
+                    image_artifacts.append(artifact)
+                    entries.append(
+                        _RenderedEntry(
+                            text=_image_placeholder(artifact),
+                            line_start=artifact.line_start,
+                            line_end=artifact.line_end,
+                            linked_artifact=_linked_artifact("image", artifact.artifact_key, artifact.locator),
+                        )
+                    )
+                    index += 1
+                    continue
+
+            entries.append(_RenderedEntry(text=line, line_start=absolute_line, line_end=absolute_line))
+            index += 1
+
+        narrative_chunks.extend(
+            _narrative_chunks_from_entries(
+                section=section,
+                entries=entries,
+                start_index=len(narrative_chunks),
+                max_chars=max_chars,
+                overlap_lines=overlap_lines,
+            )
+        )
+
+    parent_chunk_by_artifact_key: dict[str, str] = {}
+    for chunk in narrative_chunks:
+        chunk_key = chunk.chunk_key or ""
+        for artifact_ref in chunk.metadata_json.get("linked_artifacts", []):
+            artifact_key = artifact_ref.get("artifact_key")
+            if artifact_key and artifact_key not in parent_chunk_by_artifact_key:
+                parent_chunk_by_artifact_key[artifact_key] = chunk_key
+
+    artifact_chunks = _artifact_chunks(
+        table_artifacts=table_artifacts,
+        image_artifacts=image_artifacts,
+        parent_chunk_by_artifact_key=parent_chunk_by_artifact_key,
+    )
+    return [*narrative_chunks, *artifact_chunks], table_artifacts, image_artifacts
+
+
+def _narrative_chunks_from_entries(
+    *,
+    section: _Section,
+    entries: list[_RenderedEntry],
+    start_index: int,
+    max_chars: int,
+    overlap_lines: int,
+) -> list[ParsedChunk]:
+    chunks: list[ParsedChunk] = []
+    current: list[_RenderedEntry] = []
+
+    for entry in entries:
+        candidate = current + [entry]
+        if current and len(_entries_text(candidate)) > max_chars:
+            chunk = _chunk_from_entries(
+                section=section,
+                entries=current,
+                chunk_key=f"narrative_{start_index + len(chunks) + 1:03d}",
+            )
+            if chunk is not None:
+                chunks.append(chunk)
+            current = current[-overlap_lines:].copy() if overlap_lines else []
+        current.append(entry)
+
+    if current:
+        chunk = _chunk_from_entries(
+            section=section,
+            entries=current,
+            chunk_key=f"narrative_{start_index + len(chunks) + 1:03d}",
+        )
+        if chunk is not None:
+            chunks.append(chunk)
+    return chunks
+
+
+def _chunk_from_entries(*, section: _Section, entries: list[_RenderedEntry], chunk_key: str) -> ParsedChunk | None:
+    content = _entries_text(entries).strip()
+    if not content:
+        return None
+    linked_artifacts = [entry.linked_artifact for entry in entries if entry.linked_artifact is not None]
+    return ParsedChunk(
+        title=section.title,
+        content=content,
+        line_start=entries[0].line_start,
+        line_end=entries[-1].line_end,
+        heading_path=section.heading_path,
+        chunk_key=chunk_key,
+        metadata_json={
+            "knowledge_type": KNOWLEDGE_TYPE_NAME_DOCUMENT,
+            "heading_path": section.heading_path,
+            "chunk_kind": "narrative",
+            "linked_artifacts": linked_artifacts,
+        },
+    )
+
+
+def _artifact_chunks(
+    *,
+    table_artifacts: list[ParsedTableArtifact],
+    image_artifacts: list[ParsedImageArtifact],
+    parent_chunk_by_artifact_key: dict[str, str],
+) -> list[ParsedChunk]:
+    chunks: list[ParsedChunk] = []
+    for artifact in table_artifacts:
+        chunks.append(
+            ParsedChunk(
+                title=_artifact_title(artifact.heading_path, artifact.artifact_key),
+                content=_table_summary_content(artifact),
+                line_start=artifact.line_start,
+                line_end=artifact.line_end,
+                heading_path=artifact.heading_path,
+                chunk_key=f"{artifact.artifact_key}_summary",
+                metadata_json=_artifact_chunk_metadata(
+                    artifact_type="table",
+                    artifact_key=artifact.artifact_key,
+                    chunk_kind="table_summary",
+                    locator=artifact.locator,
+                    heading_path=artifact.heading_path,
+                    parent_chunk_by_artifact_key=parent_chunk_by_artifact_key,
+                ),
+            )
+        )
+        chunks.append(
+            ParsedChunk(
+                title=_artifact_title(artifact.heading_path, artifact.artifact_key),
+                content=f"Table {artifact.artifact_key} rows:\n{artifact.normalized_markdown}",
+                line_start=artifact.line_start,
+                line_end=artifact.line_end,
+                heading_path=artifact.heading_path,
+                chunk_key=f"{artifact.artifact_key}_rows_001",
+                metadata_json=_artifact_chunk_metadata(
+                    artifact_type="table",
+                    artifact_key=artifact.artifact_key,
+                    chunk_kind="table_rows",
+                    locator=artifact.locator,
+                    heading_path=artifact.heading_path,
+                    parent_chunk_by_artifact_key=parent_chunk_by_artifact_key,
+                ),
+            )
+        )
+
+    for artifact in image_artifacts:
+        chunks.append(
+            ParsedChunk(
+                title=_artifact_title(artifact.heading_path, artifact.artifact_key),
+                content=_image_summary_content(artifact),
+                line_start=artifact.line_start,
+                line_end=artifact.line_end,
+                heading_path=artifact.heading_path,
+                chunk_key=f"{artifact.artifact_key}_summary",
+                metadata_json=_artifact_chunk_metadata(
+                    artifact_type="image",
+                    artifact_key=artifact.artifact_key,
+                    chunk_kind="image_summary",
+                    locator=artifact.locator,
+                    heading_path=artifact.heading_path,
+                    parent_chunk_by_artifact_key=parent_chunk_by_artifact_key,
+                ),
+            )
+        )
+    return chunks
+
+
+def _fence_marker(line: str) -> str | None:
+    stripped = line.lstrip()
+    if stripped.startswith("```"):
+        return "```"
+    if stripped.startswith("~~~"):
+        return "~~~"
+    return None
+
+
+def _table_end_index(lines: list[str], start_index: int) -> int | None:
+    if start_index + 1 >= len(lines):
+        return None
+    if not _is_table_row(lines[start_index]) or not _is_table_separator(lines[start_index + 1]):
+        return None
+
+    end_index = start_index + 1
+    index = start_index + 2
+    while index < len(lines) and _is_table_row(lines[index]):
+        end_index = index
+        index += 1
+    return end_index
+
+
+def _is_table_row(line: str) -> bool:
+    stripped = line.strip()
+    return "|" in stripped and bool(_table_cells(line))
+
+
+def _is_table_separator(line: str) -> bool:
+    cells = _table_cells(line)
+    return bool(cells) and all(_TABLE_SEPARATOR_CELL_RE.match(cell.replace(" ", "")) for cell in cells)
+
+
+def _table_cells(line: str) -> list[str]:
+    stripped = line.strip()
+    if not stripped:
+        return []
+    if stripped.startswith("|"):
+        stripped = stripped[1:]
+    if stripped.endswith("|"):
+        stripped = stripped[:-1]
+    return [cell.strip() for cell in stripped.split("|")]
+
+
+def _parse_table(lines: list[str]) -> tuple[list[str], list[dict[str, str]]]:
+    columns = [_safe_table_cell(cell) for cell in _table_cells(lines[0])]
+    rows: list[dict[str, str]] = []
+    for line in lines[2:]:
+        cells = [_safe_table_cell(cell) for cell in _table_cells(line)]
+        row = {
+            column: cells[index] if index < len(cells) else ""
+            for index, column in enumerate(columns)
+        }
+        if any(value for value in row.values()):
+            rows.append(row)
+    return columns, rows
+
+
+def _normalized_table_markdown(columns: list[str], rows: list[dict[str, str]]) -> str:
+    header = "| " + " | ".join(columns) + " |"
+    separator = "| " + " | ".join("---" for _ in columns) + " |"
+    body = [
+        "| " + " | ".join(_escape_table_cell(row.get(column, "")) for column in columns) + " |"
+        for row in rows
+    ]
+    return "\n".join([header, separator, *body])
+
+
+def _table_summary(*, columns: list[str], rows: list[dict[str, str]]) -> str:
+    return f"Markdown table with columns {', '.join(columns)} and {len(rows)} data row(s)."
+
+
+def _table_summary_content(artifact: ParsedTableArtifact) -> str:
+    return "\n".join(
+        [
+            f"Table {artifact.artifact_key}: {artifact.summary or _table_summary(columns=artifact.columns, rows=artifact.rows)}",
+            f"Columns: {', '.join(artifact.columns)}",
+            f"Rows: {len(artifact.rows)}",
+            f"Locator: {artifact.locator}",
+        ]
+    )
+
+
+def _image_summary_content(artifact: ParsedImageArtifact) -> str:
+    parts = [
+        f"Image {artifact.artifact_key}",
+        f"Original URI: {artifact.original_uri}",
+        f"Locator: {artifact.locator}",
+    ]
+    if artifact.alt_text:
+        parts.append(f"Alt text: {artifact.alt_text}")
+    if artifact.caption:
+        parts.append(f"Caption: {artifact.caption}")
+    if artifact.nearby_text:
+        parts.append(f"Nearby text: {artifact.nearby_text}")
+    return "\n".join(parts)
+
+
+def _table_placeholder(artifact: ParsedTableArtifact) -> str:
+    columns = " / ".join(artifact.columns[:3]) or "table"
+    return f"[Table {artifact.artifact_key}: {columns}, {artifact.locator}]"
+
+
+def _image_placeholder(artifact: ParsedImageArtifact) -> str:
+    label = artifact.alt_text or artifact.original_uri
+    return f"[Image {artifact.artifact_key}: {label}, {artifact.locator}]"
+
+
+def _linked_artifact(artifact_type: str, artifact_key: str, locator: str) -> dict[str, str]:
+    return {
+        "artifact_type": artifact_type,
+        "artifact_key": artifact_key,
+        "locator": locator,
+        "role": "inline_reference",
+    }
+
+
+def _artifact_chunk_metadata(
+    *,
+    artifact_type: str,
+    artifact_key: str,
+    chunk_kind: str,
+    locator: str,
+    heading_path: list[str],
+    parent_chunk_by_artifact_key: dict[str, str],
+) -> dict[str, Any]:
+    return {
+        "knowledge_type": KNOWLEDGE_TYPE_NAME_DOCUMENT,
+        "heading_path": heading_path,
+        "chunk_kind": chunk_kind,
+        "artifact_type": artifact_type,
+        "artifact_key": artifact_key,
+        "artifact_locator": locator,
+        "parent_narrative_chunk_key": parent_chunk_by_artifact_key.get(artifact_key),
+    }
+
+
+def _artifact_title(heading_path: list[str], artifact_key: str) -> str:
+    if heading_path:
+        return _safe_title(f"{heading_path[-1]} {artifact_key}")
+    return artifact_key
+
+
+def _entries_text(entries: list[_RenderedEntry]) -> str:
+    return "\n".join(entry.text for entry in entries)
+
+
+def _parse_image_uri(raw_uri: str) -> str:
+    uri = raw_uri.strip()
+    if uri.startswith("<") and ">" in uri:
+        return uri[1 : uri.index(">")]
+    if " " in uri:
+        return uri.split(" ", 1)[0].strip("<>")
+    return uri.strip("<>")
+
+
+def _nearby_text_for_image(*, entries: list[_RenderedEntry], lines: list[str], image_index: int) -> str | None:
+    candidates: list[str] = []
+    for entry in reversed(entries):
+        text = entry.text.strip()
+        if text:
+            candidates.append(text)
+            break
+    if image_index + 1 < len(lines):
+        next_text = lines[image_index + 1].strip()
+        if next_text:
+            candidates.append(next_text)
+    return _optional_str(" ".join(candidates))
+
+
+def _safe_table_cell(value: str) -> str:
+    return value.replace("\n", " ").strip()
+
+
+def _escape_table_cell(value: str) -> str:
+    return _safe_table_cell(value).replace("|", "\\|")
 
 
 def _split_lines(

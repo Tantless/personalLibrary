@@ -49,11 +49,12 @@ src/pkcs/
 - Interface layers (`cli.py`, `mcp/server.py`, future HTTP routes) must call application services.
 - Application services own transaction orchestration, input validation, and cross-repository workflows.
 - Parsers return plain data models and must not write to the database or filesystem.
+- Markdown artifact-aware parsers return `ParsedChunk`, `ParsedTableArtifact`, and `ParsedImageArtifact`; they do not create ORM rows or copy image assets.
 - Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
 - Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.
-- Context Pack services own retrieval orchestration and Markdown rendering; they call `SearchService` and `ReadSourceService` instead of querying the database directly.
+- Context Pack services own retrieval orchestration, lightweight artifact hydration, and Markdown rendering; they call `SearchService` and `ReadSourceService`, and use artifact repositories only to hydrate already-selected evidence.
 - Repositories write ORM objects and call `flush()`, but callers own commits.
-- Storage helpers write bytes and return paths; they must not know database schema beyond path arguments passed in.
+- Storage helpers write source bytes or copied asset bytes and return paths; they must not know database schema beyond path arguments passed in.
 
 ### 4. Validation & Error Matrix
 
@@ -62,6 +63,7 @@ src/pkcs/
 | New CLI/MCP command | Add or update a test that proves it calls the shared service path |
 | New parser | Add parser or ingest tests with synthetic fixtures |
 | New repository method | Update `database-guidelines.md` signatures and repository/ingest tests |
+| New artifact-aware ingest behavior | Assert parser/service metadata links, artifact rows, and Context Pack hydration |
 | New cross-layer report field | Assert the field in service and interface tests |
 | New search result field | Assert the field in service and interface tests |
 | New reader result field | Assert the field in service and interface tests |

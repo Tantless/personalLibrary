@@ -35,6 +35,8 @@ class Source(Base):
 
     versions: Mapped[list["SourceVersion"]] = relationship(back_populates="source", cascade="all, delete-orphan")
     chunks: Mapped[list["Chunk"]] = relationship(back_populates="source", cascade="all, delete-orphan")
+    table_artifacts: Mapped[list["TableArtifact"]] = relationship(back_populates="source", cascade="all, delete-orphan")
+    image_artifacts: Mapped[list["ImageArtifact"]] = relationship(back_populates="source", cascade="all, delete-orphan")
 
 
 class SourceVersion(Base):
@@ -58,6 +60,8 @@ class SourceVersion(Base):
 
     source: Mapped[Source] = relationship(back_populates="versions")
     chunks: Mapped[list["Chunk"]] = relationship(back_populates="version", cascade="all, delete-orphan")
+    table_artifacts: Mapped[list["TableArtifact"]] = relationship(back_populates="version", cascade="all, delete-orphan")
+    image_artifacts: Mapped[list["ImageArtifact"]] = relationship(back_populates="version", cascade="all, delete-orphan")
 
 
 class Chunk(Base):
@@ -109,6 +113,55 @@ class Citation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     chunk: Mapped[Chunk] = relationship(back_populates="citations")
+
+
+class TableArtifact(Base):
+    __tablename__ = "table_artifacts"
+    __table_args__ = (UniqueConstraint("version_id", "artifact_key", name="uq_table_artifacts_version_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_id: Mapped[str] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_id: Mapped[str] = mapped_column(ForeignKey("source_versions.id", ondelete="CASCADE"), nullable=False, index=True)
+    artifact_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    locator: Mapped[str] = mapped_column(String(128), nullable=False)
+    line_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    line_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    heading_path: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    column_names: Mapped[list[str]] = mapped_column("columns", JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    rows: Mapped[list[dict[str, str]]] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    normalized_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    source: Mapped[Source] = relationship(back_populates="table_artifacts")
+    version: Mapped[SourceVersion] = relationship(back_populates="table_artifacts")
+
+
+class ImageArtifact(Base):
+    __tablename__ = "image_artifacts"
+    __table_args__ = (UniqueConstraint("version_id", "artifact_key", name="uq_image_artifacts_version_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_id: Mapped[str] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_id: Mapped[str] = mapped_column(ForeignKey("source_versions.id", ondelete="CASCADE"), nullable=False, index=True)
+    artifact_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    locator: Mapped[str] = mapped_column(String(128), nullable=False)
+    line_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    line_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    heading_path: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    original_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    asset_path: Mapped[str | None] = mapped_column(Text)
+    alt_text: Mapped[str | None] = mapped_column(Text)
+    caption: Mapped[str | None] = mapped_column(Text)
+    nearby_text: Mapped[str | None] = mapped_column(Text)
+    ocr_text: Mapped[str | None] = mapped_column(Text)
+    vision_summary: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    source: Mapped[Source] = relationship(back_populates="image_artifacts")
+    version: Mapped[SourceVersion] = relationship(back_populates="image_artifacts")
 
 
 class IngestJob(Base):

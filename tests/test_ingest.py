@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from pkcs.cli import app as cli_app
 from pkcs.config import get_settings
 from pkcs.context_pack import ContextPackService
-from pkcs.db.models import Chunk, Citation, IngestJob, SourceVersion
+from pkcs.db.models import Chunk, Citation, ImageArtifact, IngestJob, SourceVersion, TableArtifact
 from pkcs.ingest import IngestService
 from pkcs.mcp.server import create_mcp_server
 from pkcs.reader import ReadSourceService
@@ -64,6 +64,64 @@ def test_ingest_markdown_file_creates_version_chunks_citations_and_archive(db_se
     assert len(citations) == report.chunks_created
     assert any(chunk.heading_path == ["Project Notes", "Goals"] for chunk in chunks)
     assert all(citation.line_start <= citation.line_end for citation in citations)
+
+
+def test_ingest_markdown_table_and_image_artifacts(db_session, tmp_path) -> None:
+    asset_dir = tmp_path / "images"
+    asset_dir.mkdir()
+    image_path = asset_dir / "rag.png"
+    image_path.write_bytes(b"fake-png")
+    source_path = tmp_path / "artifact-notes.md"
+    source_path.write_text(
+        "# Artifact Notes\n\n"
+        "The table summarizes the retrieval flow.\n\n"
+        "| Component | Role |\n"
+        "| --- | --- |\n"
+        "| Retriever | Finds chunks |\n"
+        "| Reranker | Orders evidence |\n\n"
+        "The image shows the same architecture.\n\n"
+        "![RAG architecture](images/rag.png)\n\n"
+        "The system reads both objects through artifact links.\n",
+        encoding="utf-8",
+    )
+    service = make_service(db_session, tmp_path / "raw", chunk_max_chars=1000)
+
+    report = service.ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:artifacts-{uuid4().hex}",
+    )
+
+    assert report.status == "completed"
+    table = db_session.scalars(select(TableArtifact).where(TableArtifact.version_id == report.version_id)).one()
+    image = db_session.scalars(select(ImageArtifact).where(ImageArtifact.version_id == report.version_id)).one()
+    chunks = db_session.scalars(select(Chunk).where(Chunk.version_id == report.version_id)).all()
+    narrative = next(chunk for chunk in chunks if chunk.metadata_json["chunk_kind"] == "narrative")
+    table_rows = next(chunk for chunk in chunks if chunk.metadata_json.get("chunk_kind") == "table_rows")
+    image_summary = next(chunk for chunk in chunks if chunk.metadata_json.get("chunk_kind") == "image_summary")
+
+    assert report.chunks_created == len(chunks)
+    assert table.artifact_key == "tbl_001"
+    assert table.locator == "line 5-8"
+    assert table.column_names == ["Component", "Role"]
+    assert table.rows[0] == {"Component": "Retriever", "Role": "Finds chunks"}
+    assert "| Component | Role |" in table.normalized_markdown
+    assert image.artifact_key == "img_001"
+    assert image.locator == "line 12-12"
+    assert image.original_uri == "images/rag.png"
+    assert image.alt_text == "RAG architecture"
+    assert image.asset_path is not None
+    assert Path(image.asset_path).read_bytes() == b"fake-png"
+
+    linked = narrative.metadata_json["linked_artifacts"]
+    assert {item["artifact_type"] for item in linked} == {"table", "image"}
+    assert {item["artifact_id"] for item in linked} == {table.id, image.id}
+    assert "[Table tbl_001" in narrative.content
+    assert "[Image img_001" in narrative.content
+    assert table_rows.metadata_json["artifact_id"] == table.id
+    assert table_rows.metadata_json["parent_narrative_chunk_id"] == narrative.id
+    assert image_summary.metadata_json["artifact_id"] == image.id
+    assert image_summary.metadata_json["parent_narrative_chunk_id"] == narrative.id
 
 
 def test_ingest_duplicate_hash_skips_and_new_hash_creates_new_version(db_session, tmp_path) -> None:
@@ -179,7 +237,9 @@ def test_ingest_ai_conversation_transcript_and_jsonl_metadata(db_session, tmp_pa
     assert jsonl_version.metadata_json["format"] == "jsonl"
     assert jsonl_version.metadata_json["participants"] == ["assistant", "user"]
 
-    chunks = db_session.scalars(select(Chunk).where(Chunk.version_id == transcript_report.version_id)).all()
+    chunks = db_session.scalars(
+        select(Chunk).where(Chunk.version_id == transcript_report.version_id).order_by(Chunk.chunk_index)
+    ).all()
     assert chunks
     assert chunks[0].metadata_json["roles"]
     assert chunks[0].metadata_json["turn_start"] == 0

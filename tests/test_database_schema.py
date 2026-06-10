@@ -4,19 +4,32 @@ from sqlalchemy import inspect, text
 def test_initial_schema_and_indexes(db_session) -> None:
     inspector = inspect(db_session.bind)
 
-    assert {"sources", "source_versions", "chunks", "citations", "ingest_jobs", "source_key_counters"}.issubset(
-        set(inspector.get_table_names())
-    )
+    assert {
+        "sources",
+        "source_versions",
+        "chunks",
+        "citations",
+        "ingest_jobs",
+        "source_key_counters",
+        "table_artifacts",
+        "image_artifacts",
+    }.issubset(set(inspector.get_table_names()))
 
     source_indexes = {index["name"] for index in inspector.get_indexes("sources")}
     version_indexes = {index["name"] for index in inspector.get_indexes("source_versions")}
     chunk_indexes = {index["name"] for index in inspector.get_indexes("chunks")}
+    table_artifact_indexes = {index["name"] for index in inspector.get_indexes("table_artifacts")}
+    image_artifact_indexes = {index["name"] for index in inspector.get_indexes("image_artifacts")}
 
     assert "ix_sources_knowledge_type_code" in source_indexes
     assert "ix_source_versions_content_hash" in version_indexes
     assert "ix_source_versions_source_format_code" in version_indexes
     assert "ix_chunks_search_vector" in chunk_indexes
     assert "ix_chunks_knowledge_type_code" in chunk_indexes
+    assert "ix_table_artifacts_source_id" in table_artifact_indexes
+    assert "ix_table_artifacts_version_id" in table_artifact_indexes
+    assert "ix_image_artifacts_source_id" in image_artifact_indexes
+    assert "ix_image_artifacts_version_id" in image_artifact_indexes
 
 
 def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> None:
@@ -27,6 +40,8 @@ def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> 
         "citations",
         "ingest_jobs",
         "source_key_counters",
+        "table_artifacts",
+        "image_artifacts",
         "alembic_version",
     }
 
@@ -38,7 +53,10 @@ def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> 
             join pg_namespace n on n.oid = c.relnamespace
             where n.nspname = 'public'
               and c.relkind = 'r'
-              and c.relname in ('sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs', 'source_key_counters', 'alembic_version')
+              and c.relname in (
+                'sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs',
+                'source_key_counters', 'table_artifacts', 'image_artifacts', 'alembic_version'
+              )
             """
         )
     ).mappings().all()
@@ -51,7 +69,10 @@ def test_schema_tables_and_columns_have_concise_chinese_comments(db_session) -> 
             join pg_attribute a on a.attrelid = c.oid
             where n.nspname = 'public'
               and c.relkind = 'r'
-              and c.relname in ('sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs', 'source_key_counters', 'alembic_version')
+              and c.relname in (
+                'sources', 'source_versions', 'chunks', 'citations', 'ingest_jobs',
+                'source_key_counters', 'table_artifacts', 'image_artifacts', 'alembic_version'
+              )
               and a.attnum > 0
               and not a.attisdropped
             order by c.relname, a.attnum
@@ -126,7 +147,7 @@ def test_foreign_key_column_comments_include_referenced_table_and_column(db_sess
         if "外键" not in comment or expected_reference not in comment:
             missing_references.append((row["table_name"], row["column_name"], comment, expected_reference))
 
-    assert len(foreign_keys) == 7
+    assert len(foreign_keys) == 11
     assert not missing_references
 
 
