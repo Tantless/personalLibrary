@@ -9,4 +9,4 @@ data/raw/
 data/private/
 data/**/*.tmp
 
-.codex/
+.codex/config.toml
