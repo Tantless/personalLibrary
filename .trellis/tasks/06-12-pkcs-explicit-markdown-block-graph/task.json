@@ -48,6 +48,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Scope confirmed: implement a transient internal MarkdownBlock graph only for parser/chunk planning and trace-ingest debug visibility. Do not add source_blocks persistence or block-level query/read responsibilities.",
   "meta": {}
 }

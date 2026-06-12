@@ -4,6 +4,23 @@
 
 将 Markdown ingest 主链路从当前隐式 `_RenderedEntry` 流升级为显式 `MarkdownBlock` / block graph 流程：先把原始 Markdown 解析成稳定的文本、表格、图片等 block 节点，再从 block graph 派生 artifact、narrative chunks、artifact chunks 和落库 metadata。目标是让表格/图片对象化、chunk overlap、artifact link、trace debug 和后续 enrichment 的语义更干净。
 
+## Scope Decision
+
+用户已确认：block graph 本轮只承担 **parser/chunk planner 的内部中间模型** 与 **trace/debug 可视化输出** 两个职责。
+
+这不是新增知识层、不是持久化 graph，也不是新的查询对象。block 的价值是帮助系统把文档稳定切分成 narrative chunks 与 artifact-derived chunks，并在调试时能看清“原始 Markdown -> blocks -> artifacts -> chunks”的每一步是否符合设计。
+
+因此 MVP 明确采用：
+
+```text
+transient internal block graph
+  -> derive artifacts/chunks
+  -> expose summary in trace-ingest
+  -> persist only existing artifacts/chunks/citations metadata
+```
+
+不新增 `source_blocks` 数据表，不增加 block repository，不让 block 承担 search/read/context-pack 的一等持久化职责。
+
 ## What I Already Know
 
 * 用户最初设想的链路是：原始 Markdown -> 识别文本域/图片域/表格域 -> 分成 block -> 图片/表格生成对象 -> 对象再 chunking -> 落库。
@@ -21,7 +38,7 @@
 
 **Markdown AST 重构**通常指“用 Markdown parser 把语法解析成语法树/token stream”，例如 paragraph、blockquote、link、image、table、html block 等。这是语法层能力，回答的是“Markdown 文本里有什么结构”。
 
-**显式 block graph**是 PKCS 的领域模型，回答的是“这些结构如何参与知识摄入和检索”。它需要比 Markdown AST 多出 PKCS 语义：
+**显式 block graph**是 PKCS 的内部 ingest/chunk planning 模型，回答的是“这些结构如何辅助切 chunk、生成 artifact、建立调试可见的 link”。它需要比 Markdown AST 多出少量 PKCS 语义：
 
 * stable `block_id`
 * `block_type`：text、heading、list、code、table、image、html、blockquote 等
@@ -37,10 +54,10 @@
 
 ```text
 Markdown AST/token stream = 可选的解析原材料
-PKCS MarkdownBlock graph = ingest/chunk/artifact/enrichment 的内部合约
+PKCS MarkdownBlock graph = transient ingest/chunk planning contract
 ```
 
-实现上可以用 `markdown-it-py` 或其他 CommonMark/GFM parser 来帮助构建 block graph；但最终不应把第三方 AST 直接暴露给 ingest service、trace 或 Context Pack。PKCS 应该拥有自己的稳定 block graph dataclass。
+实现上可以用 `markdown-it-py` 或其他 CommonMark/GFM parser 来帮助构建 block graph；但最终不应把第三方 AST 直接暴露给 ingest service、trace 或 Context Pack。PKCS 应该拥有自己的稳定 internal dataclass，并且只在解析和 trace 阶段使用。
 
 ## Current Flow
 
@@ -272,13 +289,14 @@ Pros:
 * Lower blast radius than adding persistent block tables.
 * Existing search, read_source, Context Pack and artifact tables keep working.
 * Easy to compare old/new output with trace.
+* 符合用户确认的低成本边界：block 只辅助 chunking 和 debug，不承担持久化知识职责。
 
 Cons:
 
 * Block graph is not queryable after ingest except through metadata snapshots.
 * Rebuilding enrichment from old versions still requires re-parsing Raw Archive.
 
-### Approach B: Persist Source Blocks In Database
+### Approach B: Persist Source Blocks In Database (Rejected For MVP)
 
 How it works:
 
@@ -297,6 +315,7 @@ Cons:
 * Requires migration and repository changes.
 * Larger implementation and test surface.
 * Could be premature before block model stabilizes.
+* 超出用户当前目标：block 本质上只是辅助 chunk 划分，不应增加不必要的持久化成本。
 
 ### Approach C: Full Markdown AST Parser Replacement First
 
@@ -319,7 +338,7 @@ Cons:
 
 ## Recommendation
 
-Use Approach A as the first implementation step:
+Use Approach A as the confirmed first implementation step:
 
 ```text
 Internal explicit block graph
@@ -328,7 +347,7 @@ Internal explicit block graph
   + trace-ingest block_graph stage
 ```
 
-Then evaluate whether Approach B is worth doing after the block model is stable and real traces are useful.
+Do not implement Approach B in this task. A persisted `source_blocks` table can be reconsidered only if a later requirement needs block-level reprocessing, querying, or audit beyond trace debugging.
 
 This also means the existing image parsing task can stay focused:
 
@@ -348,7 +367,8 @@ The two can share parser substrate later, but they are not the same task.
 * Artifact-derived chunks must include `source_block_id`, `bound_block_ids`, `artifact_key`, and parent narrative chunk key/id.
 * `trace-ingest` must expose block graph output before parser artifact/chunk output.
 * Existing Raw Archive locator behavior must stay stable.
-* Existing table/image artifact DB schema should remain unchanged for MVP unless a later decision selects persisted `source_blocks`.
+* Existing table/image artifact DB schema must remain unchanged for MVP.
+* Block graph must be transient: no `source_blocks` table, no block repository, no block-level public API.
 
 ## Acceptance Criteria (Evolving)
 
@@ -358,6 +378,7 @@ The two can share parser substrate later, but they are not the same task.
 * [ ] When overlap includes an artifact placeholder, metadata marks it as `context_reference` instead of another primary link.
 * [ ] Artifact-derived chunks include `source_block_id` and `bound_block_ids`.
 * [ ] `trace-ingest` includes a `block_graph` stage showing block counts, block types, locators, edges, and artifact bindings.
+* [ ] No database migration is added for block persistence.
 * [ ] Current Linear Regression fixture shows why the linked YouTube image is or is not detected, with block-level diagnostics.
 * [ ] Existing ingest/search/context-pack tests pass.
 
@@ -375,7 +396,8 @@ The two can share parser substrate later, but they are not the same task.
 ## Out Of Scope
 
 * OCR, vision summary, embedding or rerank.
-* Persisted `source_blocks` table unless explicitly selected.
+* Persisted `source_blocks` table.
+* Block repository, block search API, or block-level read API.
 * PDF/HTML/docx source ingest.
 * Full CommonMark/GFM conformance for every edge case in the first PR.
 * Remote image downloading.
@@ -383,7 +405,7 @@ The two can share parser substrate later, but they are not the same task.
 
 ## Open Questions
 
-* MVP 是否采用推荐的 Approach A：先做内部 block graph，不新增 `source_blocks` 表，只把 block refs 写入 metadata？
+* 暂无阻塞问题。范围已确认：内部 transient block graph，只用于 chunk planning 和 trace/debug，不持久化 block。
 
 ## Technical Notes
 
@@ -395,4 +417,3 @@ The two can share parser substrate later, but they are not the same task.
 * Prior artifact design: `.trellis/tasks/06-10-pkcs-table-image-artifact-enrichment/prd.md`
 * Trace debug task: `.trellis/tasks/06-12-pkcs-artifact-ingest-trace-debug/prd.md`
 * Image syntax planning task: `.trellis/tasks/06-12-pkcs-comprehensive-markdown-image-block-parsing/prd.md`
-
