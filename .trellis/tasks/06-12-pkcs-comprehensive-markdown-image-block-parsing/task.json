@@ -3,7 +3,7 @@
   "name": "pkcs-comprehensive-markdown-image-block-parsing",
   "title": "brainstorm: PKCS comprehensive Markdown image block parsing",
   "description": "Design broader Markdown image recognition and image block grouping for common Markdown/HTML image forms.",
-  "status": "planning",
+  "status": "review",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 4,
   "next_action": [
     {
       "phase": 1,
@@ -42,13 +42,14 @@
       "action": "record-session"
     }
   ],
-  "commit": null,
+  "commit": "abd9f91",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [
     ".trellis/tasks/06-12-pkcs-comprehensive-markdown-image-block-parsing/prd.md",
+    ".trellis/tasks/06-12-pkcs-comprehensive-markdown-image-block-parsing/acceptance-report.md",
     "src/pkcs/ingest/parsers.py",
     "src/pkcs/ingest/models.py",
     "src/pkcs/ingest/service.py",
@@ -57,11 +58,29 @@
     "tests/test_ingest_trace.py",
     "data/private/acceptance-inputs/2026-06-12-artifact-docs/ML-For-Beginners/2-Regression/3-Linear/README.md"
   ],
-  "notes": "Planning task for broader Markdown image syntax recognition and image block grouping. Recommended direction is enhancing the existing transient Markdown block graph, with markdown-it-py only as an optional inline helper if needed.",
+  "notes": "Implemented broader Markdown image syntax recognition on top of the existing transient Markdown block graph. Automatic verification passed; awaiting user acceptance.",
   "meta": {
     "recommended_approach": "Enhance ParsedMarkdownBlockGraph classification and binding so linked, blockquote, reference, and HTML image syntax become image blocks with deterministic caption/nearby-text grouping.",
     "scope_decision": "Implement image recognition enhancement only; do not introduce a full MarkdownBlock AST in this task.",
     "implementation_direction": "Confirmed: implement on top of the existing transient block graph enhancement plan and continue this strategy if acceptance succeeds.",
-    "decision_date": "2026-06-12"
+    "decision_date": "2026-06-12",
+    "verification": [
+      "docker compose ps postgres",
+      "uv run alembic upgrade head",
+      "uv run pytest tests/test_ingest_trace.py::test_markdown_block_graph_detects_common_image_block_syntax tests/test_ingest.py::test_ingest_markdown_common_image_syntax_artifacts -q",
+      "uv run pytest tests/test_ingest_trace.py tests/test_ingest.py -q",
+      "uv run pytest tests/test_context_pack.py -q",
+      "uv run pytest",
+      "git diff --check"
+    ],
+    "test_result": "46 passed, 1 warning",
+    "sample_trace_output": "data/private/acceptance-inputs/2026-06-12-artifact-docs/image-block-trace-check.json",
+    "sample_trace_result": {
+      "block_image_count": 15,
+      "parser_image_artifacts": 15,
+      "database_image_artifacts": 15,
+      "unsupported_linked_markdown_image": 0,
+      "unsupported_html_image": 0
+    }
   }
 }
