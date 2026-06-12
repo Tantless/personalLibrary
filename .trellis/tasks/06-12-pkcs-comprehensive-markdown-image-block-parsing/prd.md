@@ -15,6 +15,10 @@
 * 用户希望 linked image 及其下面的说明段落，例如 `> 🎥 Click the image above...`，可整体划为 image block。
 * 当前 `ParsedImageArtifact` 已有 `original_uri`、`alt_text`、`caption`、`nearby_text` 字段，可以承载更多 deterministic metadata；数据库也已有 `caption`、`nearby_text`。
 * 当前实现中 trace 工具已经能暴露 parser counts、asset resolution、database rows，适合用于本任务验收。
+* 近期显式 block graph 任务已完成：Markdown 摄入现在先生成 transient `ParsedMarkdownBlockGraph`，再从 block graph 生成 narrative chunks、artifact bindings、artifact summary chunks。
+* 当前 graph 已有 `block_id`、`block_type`、`follows` edges、`artifact_bindings`、`source_block_id`、`bound_block_ids`，并通过 trace v2 暴露。
+* 当前 standalone `![alt](path)` 已成为 `block_type=image`，但 `[![alt](thumb)](target)` 仍是 `paragraph`，`<img ...>` 仍是 `html`，只在 diagnostics 中标记 `unsupported_linked_markdown_image` / `unsupported_html_image`。
+* 当前 artifact 提取只消费 `block_type=image` 的 block；因此 image 增强的最小改动点是把更多可见图片语法提升为 image block，而不是另建一套并行 artifact 解析链路。
 
 ## Research Notes
 
@@ -38,6 +42,33 @@ Sources:
 * Context Pack hydration must continue resolving artifacts via `metadata_json.artifact_id`, not by parsing placeholder text.
 * Current project has `markdown_it` importable in the environment but not declared in `pyproject.toml`; using it should add an explicit dependency.
 * Current line-based parser preserves simple `line N-M` locators; any AST approach must preserve source line mapping.
+* After the explicit block graph change, `ParsedMarkdownBlockGraph` is the ingest parser's internal structure contract for Markdown artifacts. New image recognition should integrate there first.
+
+## Recent Code Delta After Explicit Block Graph
+
+Recent commits changed the implementation boundary for this task:
+
+* `a1886d1 docs: plan explicit markdown block graph` / `20cf3db docs: confirm transient block graph scope` defined the graph as transient, not persisted.
+* `7e209c1 feat: add transient markdown block graph` added `ParsedMarkdownBlock`, `ParsedMarkdownBlockEdge`, `ParsedArtifactBinding`, and `ParsedMarkdownBlockGraph`; parser output now carries `markdown_block_graph`.
+* `11f7699 docs: complete markdown block graph task` recorded acceptance for trace v2. The Linear Regression README trace shows `blocks=298`, `artifact_bindings=3`, and diagnostics including unsupported linked/HTML images.
+
+Current code path:
+
+```text
+Markdown sections
+  -> _build_markdown_block_graph()
+  -> _artifacts_from_block_graph()
+  -> _rendered_block_entries()
+  -> _narrative_chunks_from_blocks()
+  -> _artifact_chunks()
+  -> ingest service persistence
+```
+
+Implication for this task:
+
+* Image recognition should be implemented as block graph classification/enrichment.
+* `unsupported_linked_markdown_image` and `unsupported_html_image` should become regression fixtures: after this task, those visible images should become `image` blocks and image artifacts.
+* Caption/nearby grouping should be represented through `bound_block_ids`, artifact metadata, and trace output, not only by concatenating nearby raw text.
 
 ## Proposed Image Recognition Model
 
@@ -143,74 +174,73 @@ No new DB columns required for MVP. Store extra deterministic fields in `metadat
 
 ## Feasible Approaches
 
-### Approach A: Extend Current Line Scanner With Targeted Parsers
+### Approach A: Enhance Existing Transient Block Graph (Recommended)
 
 How it works:
 
-* Add dedicated parsers for common image line shapes.
-* Keep current section/line scanning.
-* Add grouping logic around detected image lines.
+* Keep `ParsedMarkdownBlockGraph` as the single Markdown ingest substrate.
+* Replace the current single `_IMAGE_LINE_RE` branch with an image candidate classifier that runs before generic paragraph/html/blockquotes are emitted.
+* Classify standalone, blockquote, linked Markdown image, reference image, HTML `<img>`, and linked HTML image as `block_type=image` when the rendered block is image-dominant.
+* Store syntax details in `ParsedMarkdownBlock.metadata_json`: `image_syntax`, `container`, `original_uri`, `alt_text`, `image_title`, `outer_link_url`, `outer_link_title`, `html_attrs`, and reference id when present.
+* Extend artifact binding from one source block to multiple bound blocks when caption/nearby blocks are attached.
 
 Pros:
 
-* Smallest code change.
+* Fits the current parser architecture after the explicit block graph change.
 * No new explicit dependency.
 * Easy to keep line locators.
+* Trace v2 can show exactly where classification, binding, and artifact creation happened.
+* Lowest regression risk because table parsing, chunking, and DB persistence keep their current contracts.
 
 Cons:
 
-* Markdown inline parsing gets fragile quickly.
-* Hard to correctly support nested brackets, escaped parens, reference definitions, HTML attrs, and edge cases.
-* Likely to repeat the same problem when more syntax appears.
+* Targeted inline parsing must be carefully bounded.
+* Some CommonMark edge cases around nested brackets/escaped parens may remain out of scope.
 
-### Approach B: Use `markdown-it-py` Token Stream For Inline Image Detection (Recommended)
+### Approach B: Block Graph First, `markdown-it-py` As Inline Helper
 
 How it works:
 
 * Add explicit dependency on `markdown-it-py`.
-* Parse Markdown into block and inline tokens.
-* Detect image tokens, link-open wrappers around image tokens, html_inline/html_block `<img>` tags.
-* Preserve line maps from block tokens for locator.
-* Keep current table parser initially, or gradually route table recognition through the same block stream later.
-* Add a thin `MarkdownImageBlockParser` helper that returns image block candidates; current chunker consumes these candidates.
+* Keep `_build_markdown_block_graph()` as the owner of block creation.
+* Use `markdown-it-py` only inside image candidate classification for Markdown inline forms that are painful to parse with regex.
+* Continue using stdlib HTML parsing for `<img>` attrs.
 
 Pros:
 
 * Matches real Markdown structure better than regex.
 * Naturally handles linked images and reference-style images.
-* Gives a cleaner path toward a public `MarkdownBlock` AST later.
-* Still deterministic and local; no model dependency.
+* Reduces custom parsing edge cases while preserving the graph-first architecture.
 
 Cons:
 
 * Adds a declared dependency.
 * Need careful line map handling and tests.
-* HTML `<img>` still needs safe attribute parsing; standard library `html.parser` is enough for MVP.
+* Could be heavier than necessary if current target fixtures can be covered by small deterministic parsers.
 
-### Approach C: Build Full Internal MarkdownBlock AST First
+### Approach C: Separate Token-Stream Image Parser
 
 How it works:
 
-* Introduce explicit `MarkdownBlock` dataclasses for heading, paragraph, table, image, list, blockquote, code.
-* Parse block stream first, then chunk from block stream.
-* Use AST as public internal contract for future table/image/OCR/enrichment.
+* Build a separate `MarkdownImageBlockParser` from `markdown-it-py` tokens.
+* Merge its output back into the current line/block parser.
 
 Pros:
 
-* Best long-term architecture.
-* Simplifies future artifact types and trace tooling.
+* Strong Markdown syntax coverage.
+* Can be developed as a focused helper.
 
 Cons:
 
-* Larger refactor.
-* Higher regression risk.
-* Too much if the immediate problem is image recognition coverage.
+* Creates a second parser authority beside the block graph.
+* More merge logic and higher risk of locator/chunk disagreement.
+* Less aligned with the just-completed explicit block graph work.
 
 ## Recommendation
 
-Use Approach B for MVP: introduce `markdown-it-py` explicitly and build a focused image block detector from its token stream, without doing a full parser rewrite yet.
+Use Approach A for MVP: enhance the existing transient `ParsedMarkdownBlockGraph` so visible image syntax becomes `block_type=image` with richer metadata and artifact bindings.
 
-This gives enough correctness for common Markdown while keeping the PR small. A later PR can use the same token stream to replace table detection and produce a formal `MarkdownBlock` AST.
+Only add `markdown-it-py` if targeted parsing cannot cover the accepted fixtures without fragile code. If added, it should be an inline candidate helper inside block graph construction, not a parallel ingest pipeline.
 
 ## User Scope Decision
 
@@ -222,16 +252,16 @@ User selected option 1 on 2026-06-12:
 
 ## Decision (ADR-lite)
 
-**Context**: Real Markdown documents commonly use linked images, blockquote images, reference images, and HTML `<img>` tags. The current parser only recognizes whole-line plain Markdown image syntax, so visible images in real README files are missed as artifacts.
+**Context**: Real Markdown documents commonly use linked images, blockquote images, reference images, and HTML `<img>` tags. The current parser now has a transient Markdown block graph, but only whole-line plain Markdown image syntax is classified as `block_type=image`; linked and HTML images are diagnostics-only.
 
-**Decision**: Use a focused `markdown-it-py` token-stream image detector for this task, paired with bounded deterministic image block grouping. The task will not refactor the full Markdown parser into a public `MarkdownBlock` AST.
+**Decision**: Use the existing transient `ParsedMarkdownBlockGraph` as the implementation surface. Add richer image candidate classification, image block metadata, and bounded caption/nearby block binding there. Do not create a separate parser pipeline and do not persist source blocks.
 
 **Consequences**:
 
-* The immediate gap in image artifact coverage can be fixed with limited blast radius.
-* The parser still gains a cleaner path toward a future block AST because image detection will be token-based rather than regex-only.
-* Table parsing and broader chunking semantics remain stable in this task.
-* Some exotic Markdown edge cases remain out of scope until a broader AST refactor.
+* The immediate gap in image artifact coverage can be fixed with limited blast radius and direct trace visibility.
+* Table parsing, narrative chunking, artifact persistence, and Context Pack hydration remain stable.
+* `bound_block_ids` becomes the mechanism for explaining which caption/nearby blocks belong to an image artifact.
+* Some exotic Markdown edge cases remain out of scope unless `markdown-it-py` is deliberately introduced as a helper.
 
 ## Requirements (Evolving)
 
@@ -242,6 +272,8 @@ User selected option 1 on 2026-06-12:
 * Recognize single-line and simple multi-line HTML `<img>` tags.
 * Recognize linked HTML image patterns when `<a>` wraps `<img>`.
 * Group image-dominant lines plus immediately related caption/callout lines into one image block.
+* Promote supported linked/HTML/reference image syntax to `block_type=image` in `ParsedMarkdownBlockGraph` instead of emitting unsupported diagnostics.
+* Preserve `source_block_id` and expand `bound_block_ids` when caption/nearby blocks are attached to an image artifact.
 * Preserve Raw Archive source text and line locator for every image artifact.
 * Continue copying local image assets through ingest service; remote image URLs should become artifacts with `asset_path=None`.
 * Store syntax/container/link/dimension metadata in artifact metadata.
@@ -252,12 +284,14 @@ User selected option 1 on 2026-06-12:
 * [ ] A synthetic fixture with standalone, blockquote, linked, reference, and HTML images creates one `image_artifact` per visible image.
 * [ ] The user example creates one `image_artifact` whose `original_uri` is the YouTube thumbnail URL and whose metadata contains the outer YouTube link.
 * [ ] The user example image block includes the first explanatory blockquote as `caption` and preserves broader adjacent note as `nearby_text`.
+* [ ] In the user Linear Regression README trace, the linked YouTube thumbnail line is `block_type=image`, no longer an `unsupported_linked_markdown_image` diagnostic.
 * [ ] HTML `<img alt="Average price" src="images/chart.png" width="50%">` creates an image artifact with `alt_text`, `original_uri`, and dimensions in metadata.
+* [ ] HTML image blocks are no longer emitted only as generic `html` blocks with `unsupported_html_image` diagnostics.
 * [ ] Local assets from blockquote/HTML images are copied to Raw Archive when the file exists.
 * [ ] Remote image URLs do not attempt local asset copying and keep `asset_path=None`.
 * [ ] Images inside fenced code blocks are ignored.
 * [ ] Existing table/image artifact tests still pass.
-* [ ] `trace-ingest` reports the richer image syntax counts.
+* [ ] `trace-ingest` reports richer image syntax counts plus source/bound block ids for attached caption/nearby text.
 
 ## Definition of Done
 
@@ -285,3 +319,4 @@ User selected option 1 on 2026-06-12:
 * Current ingest persistence: `src/pkcs/ingest/service.py::_create_image_artifacts`
 * Current trace tool: `src/pkcs/ingest/trace.py`
 * Tests to extend: `tests/test_ingest.py`, `tests/test_ingest_trace.py`, `tests/test_context_pack.py`
+* Recent explicit block graph task: `.trellis/tasks/06-12-pkcs-explicit-markdown-block-graph/`

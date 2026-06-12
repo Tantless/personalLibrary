@@ -57,9 +57,9 @@
     "tests/test_ingest_trace.py",
     "data/private/acceptance-inputs/2026-06-12-artifact-docs/ML-For-Beginners/2-Regression/3-Linear/README.md"
   ],
-  "notes": "Planning task for broader Markdown image syntax recognition and image block grouping. Recommended direction is markdown-it-py token stream image detection with deterministic caption/nearby-text grouping.",
+  "notes": "Planning task for broader Markdown image syntax recognition and image block grouping. Recommended direction is enhancing the existing transient Markdown block graph, with markdown-it-py only as an optional inline helper if needed.",
   "meta": {
-    "recommended_approach": "Use markdown-it-py token stream for image detection, plus bounded image block grouping rules.",
+    "recommended_approach": "Enhance ParsedMarkdownBlockGraph classification and binding so linked, blockquote, reference, and HTML image syntax become image blocks with deterministic caption/nearby-text grouping.",
     "scope_decision": "Implement image recognition enhancement only; do not introduce a full MarkdownBlock AST in this task.",
     "decision_date": "2026-06-12"
   }
