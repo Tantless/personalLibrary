@@ -1,0 +1,65 @@
+{
+  "id": "pkcs-comprehensive-markdown-image-block-parsing",
+  "name": "pkcs-comprehensive-markdown-image-block-parsing",
+  "title": "brainstorm: PKCS comprehensive Markdown image block parsing",
+  "description": "Design broader Markdown image recognition and image block grouping for common Markdown/HTML image forms.",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-12",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 0,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/tasks/06-12-pkcs-comprehensive-markdown-image-block-parsing/prd.md",
+    "src/pkcs/ingest/parsers.py",
+    "src/pkcs/ingest/models.py",
+    "src/pkcs/ingest/service.py",
+    "src/pkcs/ingest/trace.py",
+    "tests/test_ingest.py",
+    "tests/test_ingest_trace.py",
+    "data/private/acceptance-inputs/2026-06-12-artifact-docs/ML-For-Beginners/2-Regression/3-Linear/README.md"
+  ],
+  "notes": "Planning task for broader Markdown image syntax recognition and image block grouping. Recommended direction is markdown-it-py token stream image detection with deterministic caption/nearby-text grouping.",
+  "meta": {
+    "recommended_approach": "Use markdown-it-py token stream for image detection, plus bounded image block grouping rules.",
+    "open_decision": "Whether to implement only image syntax coverage now or also introduce a reusable MarkdownBlock AST."
+  }
+}
