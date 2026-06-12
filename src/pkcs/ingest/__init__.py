@@ -1,3 +1,4 @@
 from pkcs.ingest.service import IngestService
+from pkcs.ingest.trace import ArtifactIngestTraceService
 
-__all__ = ["IngestService"]
+__all__ = ["ArtifactIngestTraceService", "IngestService"]

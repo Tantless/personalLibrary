@@ -1,0 +1,10 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/tasks/06-12-pkcs-artifact-ingest-trace-debug/prd.md", "reason": "Trace debug PRD"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Backend layer ownership"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "DB and metadata contracts"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verification requirements"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Privacy boundaries for debug output"}
+{"file": "src/pkcs/ingest/parsers.py", "reason": "Parser artifact flow"}
+{"file": "src/pkcs/ingest/service.py", "reason": "Ingest persistence flow"}
+{"file": "src/pkcs/cli.py", "reason": "CLI command wiring"}

@@ -6,7 +6,7 @@ import typer
 from pkcs.config import get_settings
 from pkcs.context_pack import ContextPackService
 from pkcs.health import get_health_status
-from pkcs.ingest import IngestService
+from pkcs.ingest import ArtifactIngestTraceService, IngestService
 from pkcs.reader import ReadSourceService
 from pkcs.search import SearchService
 
@@ -33,6 +33,28 @@ def ingest(
         canonical_key=canonical_key,
     )
     typer.echo(json.dumps(report.to_dict(), ensure_ascii=False))
+
+
+@app.command("trace-ingest")
+def trace_ingest(
+    path: Path = typer.Argument(..., help="Single local file to ingest and trace."),
+    knowledge_type: str = typer.Option("document", "--knowledge-type", help="document or ai_conversation."),
+    canonical_key: str | None = typer.Option(None, "--canonical-key", help="Stable source key for trace ingest."),
+    output: Path | None = typer.Option(None, "--output", help="Optional JSON file path for the trace."),
+) -> None:
+    """Trace parser, artifact, archive, and database steps for one ingest."""
+    trace = ArtifactIngestTraceService.from_settings(get_settings()).trace_ingest(
+        path=path,
+        knowledge_type=knowledge_type,
+        canonical_key=canonical_key,
+    )
+    payload = json.dumps(trace, ensure_ascii=False, indent=2)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(payload, encoding="utf-8")
+        typer.echo(json.dumps({"status": "written", "output": str(output)}, ensure_ascii=False))
+        return
+    typer.echo(payload)
 
 
 @app.command()

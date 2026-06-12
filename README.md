@@ -104,6 +104,19 @@ Directory behavior:
 
 The ingest report includes `ingest_job_id`, source/version refs, `canonical_key`, `content_hash`, chunk count, and `succeeded`/`skipped`/`failed` item lists. Item records include `input_name`, not the original full input path.
 
+### Artifact Ingest Trace
+
+Use `trace-ingest` when debugging Markdown table/image artifact flow. It performs a real single-file ingest, then emits a JSON trace from input metadata through parser output, local image asset resolution, ingest report, and database rows.
+
+```powershell
+uv run pkcs trace-ingest path/to/file.md `
+  --knowledge-type document `
+  --canonical-key document:trace-example `
+  --output data/private/trace-example.json
+```
+
+The trace shows the current implementation boundary: Markdown table/image references are objectized and linked to narrative/derived chunks, while explicit `MarkdownBlock` AST, row-group table splitting, OCR, and vision summaries are not implemented yet.
+
 ## Search
 
 PR4 supports PostgreSQL full-text search over ingested chunks. It uses PostgreSQL `simple` FTS, the database-generated `chunks.search_vector`, and ranking based on FTS rank plus explicit title match boost.
