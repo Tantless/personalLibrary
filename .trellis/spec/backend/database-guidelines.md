@@ -143,6 +143,8 @@ Markdown artifact chunk metadata:
 - `linked_artifacts.role` uses `primary_reference` when the narrative chunk owns the artifact block, and `context_reference` when the artifact appears only through chunk overlap.
 - Table derived chunks use `chunk_kind="table_summary"` or `chunk_kind="table_rows"` plus `artifact_type="table"`, `artifact_key`, `artifact_id`, `artifact_locator`, `source_block_id`, `bound_block_ids`, and `parent_narrative_chunk_id`.
 - Image derived chunks use `chunk_kind="image_summary"` plus `artifact_type="image"`, `artifact_key`, `artifact_id`, `artifact_locator`, `source_block_id`, `bound_block_ids`, and `parent_narrative_chunk_id`.
+- Image artifact `metadata_json` may include deterministic parser metadata: `image_syntax`, `container`, `image_title`, `outer_link_url`, `outer_link_title`, `html_attrs`, `reference_id`, `caption_block_ids`, and `nearby_text_block_ids`.
+- Image `bound_block_ids` contains the source image block plus any caption/nearby blocks that are attached during transient block graph planning. `source_block_id` remains the primary visible image block.
 - Placeholder text such as `[Table tbl_001: ...]` is readability-only. Code must use `metadata_json` and artifact table primary keys for reliable linking.
 - Do not add persisted `source_blocks` rows for the transient graph. Persist only the block references required in existing artifact/chunk metadata unless a separate schema PRD is accepted.
 

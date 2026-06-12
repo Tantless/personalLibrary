@@ -124,6 +124,66 @@ def test_ingest_markdown_table_and_image_artifacts(db_session, tmp_path) -> None
     assert image_summary.metadata_json["parent_narrative_chunk_id"] == narrative.id
 
 
+def test_ingest_markdown_common_image_syntax_artifacts(db_session, tmp_path) -> None:
+    asset_dir = tmp_path / "images"
+    asset_dir.mkdir()
+    (asset_dir / "slope.png").write_bytes(b"slope")
+    (asset_dir / "chart.png").write_bytes(b"chart")
+    (asset_dir / "reference.png").write_bytes(b"reference")
+    source_path = tmp_path / "image-syntax.md"
+    source_path.write_text(
+        "# Image Syntax\n\n"
+        "> ![Calculate the slope](images/slope.png)\n\n"
+        "[![ML for beginners - Understanding Linear Regression](https://img.youtube.com/vi/CRxFT8oTDMg/0.jpg)](https://youtu.be/CRxFT8oTDMg \"ML for beginners - Understanding Linear Regression\")\n\n"
+        "> 🎥 Click the image above for a short video overview of linear regression.\n\n"
+        "> Throughout this curriculum, we assume minimal knowledge of math.\n\n"
+        "<img alt=\"Average price\" src=\"images/chart.png\" width=\"50%\"/>\n\n"
+        "![Reference diagram][diagram]\n\n"
+        "[diagram]: images/reference.png \"Reference diagram\"\n",
+        encoding="utf-8",
+    )
+    service = make_service(db_session, tmp_path / "raw", chunk_max_chars=1000)
+
+    report = service.ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:image-syntax-{uuid4().hex}",
+    )
+
+    images = db_session.scalars(
+        select(ImageArtifact).where(ImageArtifact.version_id == report.version_id).order_by(ImageArtifact.artifact_key)
+    ).all()
+    assert report.status == "completed"
+    assert [image.original_uri for image in images] == [
+        "images/slope.png",
+        "https://img.youtube.com/vi/CRxFT8oTDMg/0.jpg",
+        "images/chart.png",
+        "images/reference.png",
+    ]
+    assert [image.metadata_json["image_syntax"] for image in images] == [
+        "blockquote_markdown_image",
+        "linked_markdown_image",
+        "html_img",
+        "reference_image",
+    ]
+    assert images[0].asset_path is not None
+    assert Path(images[0].asset_path).read_bytes() == b"slope"
+    assert images[1].asset_path is None
+    assert images[1].metadata_json["outer_link_url"] == "https://youtu.be/CRxFT8oTDMg"
+    assert images[1].caption == "> 🎥 Click the image above for a short video overview of linear regression."
+    assert images[1].nearby_text == "> Throughout this curriculum, we assume minimal knowledge of math."
+    assert len(images[1].metadata_json["bound_block_ids"]) == 3
+    assert images[2].metadata_json["html_attrs"]["width"] == "50%"
+    assert Path(images[2].asset_path).read_bytes() == b"chart"
+    assert images[3].metadata_json["reference_id"] == "diagram"
+
+    chunks = db_session.scalars(select(Chunk).where(Chunk.version_id == report.version_id)).all()
+    image_summaries = [chunk for chunk in chunks if chunk.metadata_json.get("chunk_kind") == "image_summary"]
+    assert len(image_summaries) == 4
+    linked_summary = next(chunk for chunk in image_summaries if chunk.metadata_json["artifact_key"] == "img_002")
+    assert linked_summary.metadata_json["bound_block_ids"] == images[1].metadata_json["bound_block_ids"]
+
+
 def test_ingest_duplicate_hash_skips_and_new_hash_creates_new_version(db_session, tmp_path) -> None:
     source_path = tmp_path / "versioned.md"
     source_path.write_text("# Versioned\n\nOriginal body.\n", encoding="utf-8")

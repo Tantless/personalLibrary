@@ -469,7 +469,9 @@ def _design_delta() -> dict[str, Any]:
         "implemented": [
             "Markdown section scanning by heading.",
             "Transient explicit MarkdownBlock graph for parser/chunk planning.",
-            "Atomic Markdown table and single-line image reference detection.",
+            "Atomic Markdown table detection.",
+            "Markdown image block detection for standalone, blockquote, linked, reference, and HTML img forms.",
+            "Bound caption/nearby block metadata for image artifacts.",
             "Table/image parsed artifacts.",
             "Narrative placeholders plus metadata linked_artifacts.",
             "Primary/context artifact link roles for block overlap.",

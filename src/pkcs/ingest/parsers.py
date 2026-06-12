@@ -1,6 +1,7 @@
 import json
 import re
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,36 @@ class _ChunkBlockEntry:
 
 
 @dataclass(frozen=True)
+class _MarkdownReferenceDefinition:
+    uri: str
+    title: str | None = None
+
+
+@dataclass(frozen=True)
+class _ImageCandidate:
+    image_syntax: str
+    original_uri: str
+    alt_text: str | None = None
+    image_title: str | None = None
+    container: str = "paragraph"
+    outer_link_url: str | None = None
+    outer_link_title: str | None = None
+    html_attrs: dict[str, str] | None = None
+    reference_id: str | None = None
+
+
+@dataclass(frozen=True)
+class _ImageBlockContext:
+    caption: str | None
+    nearby_text: str | None
+    bound_block_ids: list[str]
+    caption_block_ids: list[str]
+    nearby_text_block_ids: list[str]
+    line_start: int
+    line_end: int
+
+
+@dataclass(frozen=True)
 class _Turn:
     role: str
     text: str
@@ -55,7 +86,11 @@ class _TurnWindow:
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _SPEAKER_RE = re.compile(r"^([A-Za-z][A-Za-z0-9 _.-]{0,40}):\s*(.*)$")
-_IMAGE_LINE_RE = re.compile(r"^\s*!\[([^\]]*)\]\((.+?)\)\s*$")
+_MARKDOWN_IMAGE_LINE_RE = re.compile(r"^!\[([^\]]*)\]\((.+?)\)\s*$")
+_LINKED_MARKDOWN_IMAGE_LINE_RE = re.compile(r"^\[\s*!\[([^\]]*)\]\((.+?)\)\s*\]\((.+?)\)\s*$")
+_REFERENCE_IMAGE_LINE_RE = re.compile(r"^!\[([^\]]+)\]\[([^\]]*)\]\s*$")
+_SHORTCUT_REFERENCE_IMAGE_LINE_RE = re.compile(r"^!\[([^\]]+)\]\s*$")
+_REFERENCE_DEFINITION_RE = re.compile(r"^\s*\[([^\]]+)\]:\s*(\S+)(?:\s+(.+?))?\s*$")
 _TABLE_SEPARATOR_CELL_RE = re.compile(r"^:?-{3,}:?$")
 
 
@@ -267,6 +302,7 @@ def _build_markdown_block_graph(*, title: str, sections: list[_Section]) -> Pars
     edges: list[ParsedMarkdownBlockEdge] = []
     diagnostics: list[dict[str, Any]] = []
     previous_block_id: str | None = None
+    reference_definitions = _markdown_reference_definitions(sections)
 
     for section_index, section in enumerate(sections):
         index = 0
@@ -322,9 +358,33 @@ def _build_markdown_block_graph(*, title: str, sections: list[_Section]) -> Pars
                 index = table_end + 1
                 continue
 
-            image_match = _IMAGE_LINE_RE.match(line)
-            if image_match:
-                original_uri = _parse_image_uri(image_match.group(2))
+            html_image_end = _html_image_block_end_index(section.lines, index)
+            if html_image_end is not None:
+                block_lines = section.lines[index : html_image_end + 1]
+                raw_text = "\n".join(block_lines)
+                candidate = _html_image_candidate(raw_text)
+                if candidate is not None:
+                    block = _markdown_block(
+                        block_index=len(blocks),
+                        block_type="image",
+                        line_start=absolute_line,
+                        line_end=section.line_start + html_image_end,
+                        heading_path=section.heading_path,
+                        raw_text=raw_text,
+                        normalized_text=candidate.original_uri,
+                        metadata_json=_image_block_metadata(
+                            section_index=section_index,
+                            section_title=section.title,
+                            candidate=candidate,
+                        ),
+                    )
+                    blocks.append(block)
+                    previous_block_id = _append_follows_edge(edges, previous_block_id, block.block_id)
+                    index = html_image_end + 1
+                    continue
+
+            image_candidate = _markdown_image_candidate(line, reference_definitions)
+            if image_candidate is not None:
                 block = _markdown_block(
                     block_index=len(blocks),
                     block_type="image",
@@ -332,14 +392,12 @@ def _build_markdown_block_graph(*, title: str, sections: list[_Section]) -> Pars
                     line_end=absolute_line,
                     heading_path=section.heading_path,
                     raw_text=line,
-                    normalized_text=original_uri,
-                    metadata_json={
-                        "section_index": section_index,
-                        "section_title": section.title,
-                        "image_syntax": "markdown_image",
-                        "original_uri": original_uri,
-                        "alt_text": _optional_str(image_match.group(1)),
-                    },
+                    normalized_text=image_candidate.original_uri,
+                    metadata_json=_image_block_metadata(
+                        section_index=section_index,
+                        section_title=section.title,
+                        candidate=image_candidate,
+                    ),
                 )
                 blocks.append(block)
                 previous_block_id = _append_follows_edge(edges, previous_block_id, block.block_id)
@@ -404,6 +462,211 @@ def _append_follows_edge(
             )
         )
     return block_id
+
+
+def _markdown_reference_definitions(sections: list[_Section]) -> dict[str, _MarkdownReferenceDefinition]:
+    definitions: dict[str, _MarkdownReferenceDefinition] = {}
+    for section in sections:
+        for line in section.lines:
+            match = _REFERENCE_DEFINITION_RE.match(line)
+            if not match:
+                continue
+            label = _normalize_reference_label(match.group(1))
+            raw_destination = match.group(2)
+            if match.group(3):
+                raw_destination = f"{raw_destination} {match.group(3)}"
+            uri, title = _parse_link_destination(raw_destination)
+            definitions[label] = _MarkdownReferenceDefinition(uri=uri, title=title)
+    return definitions
+
+
+def _markdown_image_candidate(
+    line: str,
+    reference_definitions: dict[str, _MarkdownReferenceDefinition],
+) -> _ImageCandidate | None:
+    content, container = _image_markdown_line_content(line)
+
+    linked_match = _LINKED_MARKDOWN_IMAGE_LINE_RE.match(content)
+    if linked_match:
+        image_uri, image_title = _parse_link_destination(linked_match.group(2))
+        outer_link_url, outer_link_title = _parse_link_destination(linked_match.group(3))
+        return _ImageCandidate(
+            image_syntax="linked_markdown_image",
+            original_uri=image_uri,
+            alt_text=_optional_str(linked_match.group(1)),
+            image_title=image_title,
+            container=container,
+            outer_link_url=outer_link_url,
+            outer_link_title=outer_link_title,
+        )
+
+    image_match = _MARKDOWN_IMAGE_LINE_RE.match(content)
+    if image_match:
+        image_uri, image_title = _parse_link_destination(image_match.group(2))
+        return _ImageCandidate(
+            image_syntax="blockquote_markdown_image" if container == "blockquote" else "markdown_image",
+            original_uri=image_uri,
+            alt_text=_optional_str(image_match.group(1)),
+            image_title=image_title,
+            container=container,
+        )
+
+    reference_match = _REFERENCE_IMAGE_LINE_RE.match(content)
+    if reference_match:
+        reference_id = reference_match.group(2).strip() or reference_match.group(1).strip()
+        definition = reference_definitions.get(_normalize_reference_label(reference_id))
+        if definition is None:
+            return None
+        return _ImageCandidate(
+            image_syntax="reference_image",
+            original_uri=definition.uri,
+            alt_text=_optional_str(reference_match.group(1)),
+            image_title=definition.title,
+            container=container,
+            reference_id=reference_id,
+        )
+
+    shortcut_match = _SHORTCUT_REFERENCE_IMAGE_LINE_RE.match(content)
+    if shortcut_match:
+        reference_id = shortcut_match.group(1).strip()
+        definition = reference_definitions.get(_normalize_reference_label(reference_id))
+        if definition is None:
+            return None
+        return _ImageCandidate(
+            image_syntax="reference_image",
+            original_uri=definition.uri,
+            alt_text=_optional_str(shortcut_match.group(1)),
+            image_title=definition.title,
+            container=container,
+            reference_id=reference_id,
+        )
+
+    return None
+
+
+def _image_markdown_line_content(line: str) -> tuple[str, str]:
+    stripped = line.strip()
+    if stripped.startswith(">"):
+        return stripped[1:].strip(), "blockquote"
+    return stripped, "paragraph"
+
+
+def _html_image_block_end_index(lines: list[str], start_index: int) -> int | None:
+    line = lines[start_index]
+    if not _is_image_dominant_html_start(line):
+        return None
+    if ">" in line:
+        return start_index
+
+    for index in range(start_index + 1, min(len(lines), start_index + 6)):
+        if ">" in lines[index]:
+            return index
+        if not lines[index].strip():
+            return None
+    return None
+
+
+def _is_image_dominant_html_start(line: str) -> bool:
+    stripped = line.strip().lower()
+    return "<img" in stripped and (stripped.startswith("<img") or stripped.startswith("<a"))
+
+
+def _html_image_candidate(raw_text: str) -> _ImageCandidate | None:
+    parser = _HtmlImageCandidateParser()
+    parser.feed(raw_text)
+    if not parser.images:
+        return None
+
+    image = parser.images[0]
+    attrs = image["attrs"]
+    original_uri = attrs.get("src")
+    if not original_uri:
+        return None
+    outer_link_url = image.get("outer_link_url")
+    return _ImageCandidate(
+        image_syntax="linked_html_img" if outer_link_url else "html_img",
+        original_uri=original_uri,
+        alt_text=_optional_str(attrs.get("alt")),
+        container="html",
+        outer_link_url=outer_link_url,
+        outer_link_title=image.get("outer_link_title"),
+        html_attrs=attrs,
+    )
+
+
+class _HtmlImageCandidateParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._link_stack: list[dict[str, str]] = []
+        self.images: list[dict[str, Any]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._handle_tag(tag, attrs, closes_immediately=False)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._handle_tag(tag, attrs, closes_immediately=True)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "a" and self._link_stack:
+            self._link_stack.pop()
+
+    def _handle_tag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+        *,
+        closes_immediately: bool,
+    ) -> None:
+        tag_name = tag.lower()
+        attrs_dict = {key.lower(): value or "" for key, value in attrs}
+        if tag_name == "a":
+            self._link_stack.append(attrs_dict)
+            if closes_immediately and self._link_stack:
+                self._link_stack.pop()
+            return
+        if tag_name != "img":
+            return
+
+        outer_link = self._link_stack[-1] if self._link_stack else {}
+        self.images.append(
+            {
+                "attrs": attrs_dict,
+                "outer_link_url": _optional_str(outer_link.get("href")),
+                "outer_link_title": _optional_str(outer_link.get("title")),
+            }
+        )
+
+
+def _image_block_metadata(
+    *,
+    section_index: int,
+    section_title: str,
+    candidate: _ImageCandidate,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "section_index": section_index,
+        "section_title": section_title,
+        "image_syntax": candidate.image_syntax,
+        "container": candidate.container,
+        "original_uri": candidate.original_uri,
+    }
+    if candidate.alt_text:
+        metadata["alt_text"] = candidate.alt_text
+    if candidate.image_title:
+        metadata["image_title"] = candidate.image_title
+    if candidate.outer_link_url:
+        metadata["outer_link_url"] = candidate.outer_link_url
+    if candidate.outer_link_title:
+        metadata["outer_link_title"] = candidate.outer_link_title
+    if candidate.html_attrs:
+        metadata["html_attrs"] = candidate.html_attrs
+    if candidate.reference_id:
+        metadata["reference_id"] = candidate.reference_id
+    return metadata
+
+
+def _normalize_reference_label(value: str) -> str:
+    return " ".join(value.strip().casefold().split())
 
 
 def _code_fence_end_index(lines: list[str], start_index: int, fence_marker: str) -> int:
@@ -496,25 +759,28 @@ def _artifacts_from_block_graph(
 
         if block.block_type == "image":
             artifact_key = f"img_{len(image_artifacts) + 1:03d}"
-            nearby_text = _nearby_text_for_image_block(blocks=graph.blocks, image_index=block_index)
+            context = _image_context_for_block(blocks=graph.blocks, image_index=block_index)
             artifact = ParsedImageArtifact(
                 artifact_key=artifact_key,
-                line_start=block.line_start,
-                line_end=block.line_end,
+                line_start=context.line_start,
+                line_end=context.line_end,
                 heading_path=block.heading_path,
                 original_uri=str(block.metadata_json["original_uri"]),
                 alt_text=_optional_str(block.metadata_json.get("alt_text")),
-                nearby_text=nearby_text,
+                caption=context.caption,
+                nearby_text=context.nearby_text,
                 metadata_json={
                     "source_block_id": block.block_id,
-                    "bound_block_ids": [block.block_id],
+                    "bound_block_ids": context.bound_block_ids,
                     "source_block_type": block.block_type,
-                    "image_syntax": block.metadata_json.get("image_syntax"),
+                    "caption_block_ids": context.caption_block_ids,
+                    "nearby_text_block_ids": context.nearby_text_block_ids,
+                    **_image_artifact_metadata(block.metadata_json),
                 },
             )
             image_artifacts.append(artifact)
             artifact_by_block_id[block.block_id] = artifact
-            artifact_bindings.append(_artifact_binding("image", artifact, block))
+            artifact_bindings.append(_artifact_binding("image", artifact, block, context.bound_block_ids))
 
     return table_artifacts, image_artifacts, artifact_bindings, artifact_by_block_id
 
@@ -523,12 +789,13 @@ def _artifact_binding(
     artifact_type: str,
     artifact: ParsedTableArtifact | ParsedImageArtifact,
     block: ParsedMarkdownBlock,
+    bound_block_ids: list[str] | None = None,
 ) -> ParsedArtifactBinding:
     return ParsedArtifactBinding(
         artifact_type=artifact_type,  # type: ignore[arg-type]
         artifact_key=artifact.artifact_key,
         source_block_id=block.block_id,
-        bound_block_ids=[block.block_id],
+        bound_block_ids=bound_block_ids or [block.block_id],
         role="primary",
         locator=artifact.locator,
     )
@@ -571,6 +838,8 @@ def _rendered_block_entries(
             )
             continue
         if isinstance(artifact, ParsedImageArtifact):
+            source_block_id = _optional_str(artifact.metadata_json.get("source_block_id")) or block.block_id
+            bound_block_ids = _list_metadata(artifact.metadata_json.get("bound_block_ids")) or [block.block_id]
             entries.append(
                 _ChunkBlockEntry(
                     block=block,
@@ -579,8 +848,8 @@ def _rendered_block_entries(
                         artifact_type="image",
                         artifact_key=artifact.artifact_key,
                         locator=artifact.locator,
-                        source_block_id=block.block_id,
-                        bound_block_ids=[block.block_id],
+                        source_block_id=source_block_id,
+                        bound_block_ids=bound_block_ids,
                     ),
                 )
             )
@@ -926,32 +1195,112 @@ def _block_entries_text(entries: list[_ChunkBlockEntry]) -> str:
     return "\n".join(entry.rendered_text for entry in entries)
 
 
-def _parse_image_uri(raw_uri: str) -> str:
-    uri = raw_uri.strip()
+def _parse_link_destination(raw_destination: str) -> tuple[str, str | None]:
+    uri = raw_destination.strip()
     if uri.startswith("<") and ">" in uri:
-        return uri[1 : uri.index(">")]
+        end_index = uri.index(">")
+        destination = uri[1:end_index]
+        title = _optional_str(uri[end_index + 1 :].strip())
+        return destination, _strip_link_title(title) if title else None
     if " " in uri:
-        return uri.split(" ", 1)[0].strip("<>")
-    return uri.strip("<>")
+        destination, raw_title = uri.split(" ", 1)
+        return destination.strip("<>"), _strip_link_title(raw_title)
+    return uri.strip("<>"), None
 
 
-def _nearby_text_for_image_block(*, blocks: list[ParsedMarkdownBlock], image_index: int) -> str | None:
-    candidates: list[str] = []
-    for block in reversed(blocks[:image_index]):
-        if block.block_type == "blank":
-            continue
-        text = block.raw_text.strip()
-        if text:
-            candidates.append(text)
-            break
+def _strip_link_title(raw_title: str | None) -> str | None:
+    if raw_title is None:
+        return None
+    title = raw_title.strip()
+    if len(title) >= 2 and title[0] == title[-1] and title[0] in {"\"", "'"}:
+        title = title[1:-1]
+    elif len(title) >= 2 and title[0] == "(" and title[-1] == ")":
+        title = title[1:-1]
+    return _optional_str(title)
+
+
+def _image_artifact_metadata(block_metadata: dict[str, Any]) -> dict[str, Any]:
+    keys = [
+        "image_syntax",
+        "container",
+        "image_title",
+        "outer_link_url",
+        "outer_link_title",
+        "html_attrs",
+        "reference_id",
+    ]
+    return {key: block_metadata[key] for key in keys if key in block_metadata}
+
+
+def _image_context_for_block(*, blocks: list[ParsedMarkdownBlock], image_index: int) -> _ImageBlockContext:
+    image_block = blocks[image_index]
+    bound_blocks = [image_block]
+    caption_blocks: list[ParsedMarkdownBlock] = []
+    nearby_blocks: list[ParsedMarkdownBlock] = []
+    attached_nonblank = 0
+    attached_chars = 0
+    section_index = image_block.metadata_json.get("section_index")
+
     for block in blocks[image_index + 1 :]:
+        if block.metadata_json.get("section_index") != section_index:
+            break
         if block.block_type == "blank":
             continue
-        next_text = block.raw_text.strip()
-        if next_text:
-            candidates.append(next_text)
+        if block.block_type in {"heading", "table", "image", "code_fence", "thematic_break"}:
             break
-    return _optional_str(" ".join(candidates))
+
+        text = block.raw_text.strip()
+        if not text:
+            continue
+        if attached_nonblank >= 3 or attached_chars + len(text) > 600:
+            break
+
+        if not caption_blocks and _is_image_caption_block(block):
+            caption_blocks.append(block)
+            bound_blocks.append(block)
+            attached_nonblank += 1
+            attached_chars += len(text)
+            continue
+        if caption_blocks and not nearby_blocks and _is_image_nearby_block(block):
+            nearby_blocks.append(block)
+            bound_blocks.append(block)
+        break
+
+    return _ImageBlockContext(
+        caption=_joined_block_text(caption_blocks),
+        nearby_text=_joined_block_text(nearby_blocks),
+        bound_block_ids=[block.block_id for block in bound_blocks],
+        caption_block_ids=[block.block_id for block in caption_blocks],
+        nearby_text_block_ids=[block.block_id for block in nearby_blocks],
+        line_start=min(block.line_start for block in bound_blocks),
+        line_end=max(block.line_end for block in bound_blocks),
+    )
+
+
+def _is_image_caption_block(block: ParsedMarkdownBlock) -> bool:
+    text = _plain_context_text(block.raw_text)
+    lowered = text.casefold()
+    if block.block_type == "blockquote" and any(phrase in lowered for phrase in ["image above", "video overview"]):
+        return True
+    return lowered.startswith(("figure", "fig.", "caption", "image", "图", "表"))
+
+
+def _is_image_nearby_block(block: ParsedMarkdownBlock) -> bool:
+    return block.block_type in {"blockquote", "paragraph", "list"}
+
+
+def _plain_context_text(raw_text: str) -> str:
+    lines = []
+    for line in raw_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(">"):
+            stripped = stripped[1:].strip()
+        lines.append(stripped)
+    return " ".join(line for line in lines if line)
+
+
+def _joined_block_text(blocks: list[ParsedMarkdownBlock]) -> str | None:
+    return _optional_str("\n".join(block.raw_text.strip() for block in blocks if block.raw_text.strip()))
 
 
 def _list_metadata(value: Any) -> list[str]:

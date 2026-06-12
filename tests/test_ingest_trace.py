@@ -145,6 +145,62 @@ def test_markdown_block_graph_marks_overlap_artifact_links_as_context(tmp_path) 
     assert table_rows.metadata_json["parent_narrative_chunk_key"] == primary_chunk.chunk_key
 
 
+def test_markdown_block_graph_detects_common_image_block_syntax(tmp_path) -> None:
+    source_path = tmp_path / "image-syntax.md"
+    source_path.write_text(
+        "# Image Syntax\n\n"
+        "> ![Calculate the slope](images/slope.png)\n\n"
+        "[![ML for beginners - Understanding Linear Regression](https://img.youtube.com/vi/CRxFT8oTDMg/0.jpg)](https://youtu.be/CRxFT8oTDMg \"ML for beginners - Understanding Linear Regression\")\n\n"
+        "> 🎥 Click the image above for a short video overview of linear regression.\n\n"
+        "> Throughout this curriculum, we assume minimal knowledge of math.\n\n"
+        "<img alt=\"Average price\" src=\"images/chart.png\" width=\"50%\"/>\n\n"
+        "![Reference diagram][diagram]\n\n"
+        "[diagram]: images/reference.png \"Reference diagram\"\n\n"
+        "```md\n"
+        "![Not an artifact](images/code.png)\n"
+        "```\n",
+        encoding="utf-8",
+    )
+
+    parsed = parse_source_file(
+        path=source_path,
+        knowledge_type="document",
+        content_bytes=source_path.read_bytes(),
+        max_chars=1000,
+        overlap_lines=1,
+    )
+
+    graph = parsed.markdown_block_graph
+    assert graph is not None
+    image_blocks = [block for block in graph.blocks if block.block_type == "image"]
+    image_syntaxes = {block.metadata_json["image_syntax"] for block in image_blocks}
+    assert image_syntaxes == {
+        "blockquote_markdown_image",
+        "linked_markdown_image",
+        "html_img",
+        "reference_image",
+    }
+    assert not any(item["code"] == "unsupported_linked_markdown_image" for item in graph.diagnostics)
+    assert not any(item["code"] == "unsupported_html_image" for item in graph.diagnostics)
+
+    linked = next(artifact for artifact in parsed.image_artifacts if artifact.metadata_json["image_syntax"] == "linked_markdown_image")
+    assert linked.original_uri == "https://img.youtube.com/vi/CRxFT8oTDMg/0.jpg"
+    assert linked.metadata_json["outer_link_url"] == "https://youtu.be/CRxFT8oTDMg"
+    assert linked.caption == "> 🎥 Click the image above for a short video overview of linear regression."
+    assert linked.nearby_text == "> Throughout this curriculum, we assume minimal knowledge of math."
+    assert linked.locator == "line 5-9"
+    assert len(linked.metadata_json["bound_block_ids"]) == 3
+
+    html_image = next(artifact for artifact in parsed.image_artifacts if artifact.metadata_json["image_syntax"] == "html_img")
+    assert html_image.original_uri == "images/chart.png"
+    assert html_image.alt_text == "Average price"
+    assert html_image.metadata_json["html_attrs"]["width"] == "50%"
+
+    reference_image = next(artifact for artifact in parsed.image_artifacts if artifact.metadata_json["image_syntax"] == "reference_image")
+    assert reference_image.original_uri == "images/reference.png"
+    assert reference_image.metadata_json["reference_id"] == "diagram"
+
+
 def test_cli_trace_ingest_outputs_trace(monkeypatch, migrated_database_url, tmp_path) -> None:
     token = uuid4().hex
     source_path = write_artifact_markdown(tmp_path, token)
