@@ -60,6 +60,7 @@
   "notes": "Planning task for broader Markdown image syntax recognition and image block grouping. Recommended direction is markdown-it-py token stream image detection with deterministic caption/nearby-text grouping.",
   "meta": {
     "recommended_approach": "Use markdown-it-py token stream for image detection, plus bounded image block grouping rules.",
-    "open_decision": "Whether to implement only image syntax coverage now or also introduce a reusable MarkdownBlock AST."
+    "scope_decision": "Implement image recognition enhancement only; do not introduce a full MarkdownBlock AST in this task.",
+    "decision_date": "2026-06-12"
   }
 }

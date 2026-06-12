@@ -212,6 +212,27 @@ Use Approach B for MVP: introduce `markdown-it-py` explicitly and build a focuse
 
 This gives enough correctness for common Markdown while keeping the PR small. A later PR can use the same token stream to replace table detection and produce a formal `MarkdownBlock` AST.
 
+## User Scope Decision
+
+User selected option 1 on 2026-06-12:
+
+* Implement image recognition enhancement only.
+* Do not introduce a full public/internal `MarkdownBlock` AST in this task.
+* Keep table parsing and the rest of the chunking architecture scoped to the current implementation unless a small adapter is required for image blocks.
+
+## Decision (ADR-lite)
+
+**Context**: Real Markdown documents commonly use linked images, blockquote images, reference images, and HTML `<img>` tags. The current parser only recognizes whole-line plain Markdown image syntax, so visible images in real README files are missed as artifacts.
+
+**Decision**: Use a focused `markdown-it-py` token-stream image detector for this task, paired with bounded deterministic image block grouping. The task will not refactor the full Markdown parser into a public `MarkdownBlock` AST.
+
+**Consequences**:
+
+* The immediate gap in image artifact coverage can be fixed with limited blast radius.
+* The parser still gains a cleaner path toward a future block AST because image detection will be token-based rather than regex-only.
+* Table parsing and broader chunking semantics remain stable in this task.
+* Some exotic Markdown edge cases remain out of scope until a broader AST refactor.
+
 ## Requirements (Evolving)
 
 * Recognize standalone Markdown image lines.
@@ -264,4 +285,3 @@ This gives enough correctness for common Markdown while keeping the PR small. A 
 * Current ingest persistence: `src/pkcs/ingest/service.py::_create_image_artifacts`
 * Current trace tool: `src/pkcs/ingest/trace.py`
 * Tests to extend: `tests/test_ingest.py`, `tests/test_ingest_trace.py`, `tests/test_context_pack.py`
-
