@@ -3,7 +3,7 @@
   "name": "pkcs-table-image-artifact-enrichment",
   "title": "brainstorm: PKCS table image artifact enrichment",
   "description": "",
-  "status": "planning",
+  "status": "completed",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "tantless",
   "assignee": "tantless",
   "createdAt": "2026-06-10",
-  "completedAt": null,
+  "completedAt": "2026-06-12",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 6,
   "next_action": [
     {
       "phase": 1,
@@ -42,12 +42,52 @@
       "action": "record-session"
     }
   ],
-  "commit": null,
+  "commit": "371ce9c,0630300,ca65926,37fa093,be72f2d",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
-  "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "relatedFiles": [
+    ".trellis/tasks/06-10-pkcs-table-image-artifact-enrichment/prd.md",
+    ".trellis/tasks/06-10-pkcs-table-image-artifact-enrichment/acceptance-report.md",
+    "migrations/versions/20260610_0008_add_markdown_artifacts.py",
+    "src/pkcs/ingest/models.py",
+    "src/pkcs/ingest/parsers.py",
+    "src/pkcs/ingest/service.py",
+    "src/pkcs/db/models.py",
+    "src/pkcs/db/repositories.py",
+    "src/pkcs/storage/raw_archive.py",
+    "src/pkcs/context_pack/service.py",
+    "tests/test_ingest.py",
+    "tests/test_search.py",
+    "tests/test_context_pack.py",
+    "tests/test_database_schema.py",
+    "tests/test_repositories.py"
+  ],
+  "notes": "Markdown-only table/image artifact-aware ingest skeleton has been implemented and accepted locally. Scope remains limited to Markdown table and Markdown image references; OCR, vision, embedding, rerank, and non-Markdown formats stay out of scope.",
+  "meta": {
+    "accepted_scope": [
+      "Markdown table and image artifact schema.",
+      "Artifact-aware Markdown parser and derived retrieval chunks.",
+      "Ingest persistence for table/image artifacts and local image asset archive copies.",
+      "Search result metadata for artifact-derived chunks.",
+      "Context Pack Level 1 artifact hydration for linked and artifact-derived chunks."
+    ],
+    "verification": [
+      "git fetch --dry-run",
+      "docker compose ps postgres",
+      "docker compose up -d postgres",
+      "uv run alembic upgrade head",
+      "uv run pytest",
+      "python .trellis/scripts/task.py validate .trellis/tasks/06-10-pkcs-table-image-artifact-enrichment",
+      "git diff --check"
+    ],
+    "test_result": "41 passed, 1 warning",
+    "out_of_scope": [
+      "PDF/HTML/docx artifact parsing.",
+      "OCR or vision API enrichment.",
+      "Embedding, rerank, or semantic retrieval.",
+      "Codex/Claude Code as default ingest-time vision provider."
+    ]
+  }
 }
