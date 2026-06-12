@@ -4,7 +4,7 @@
   "title": "brainstorm: PKCS explicit Markdown block graph",
   "description": "Design an explicit MarkdownBlock/block graph parsing pipeline to replace the current implicit rendered-entry artifact flow.",
   "status": "planning",
-  "dev_type": null,
+  "dev_type": "backend",
   "scope": null,
   "package": null,
   "priority": "P2",

@@ -115,7 +115,7 @@ uv run pkcs trace-ingest path/to/file.md `
   --output data/private/trace-example.json
 ```
 
-The trace shows the current implementation boundary: Markdown table/image references are objectized and linked to narrative/derived chunks, while explicit `MarkdownBlock` AST, row-group table splitting, OCR, and vision summaries are not implemented yet.
+The trace shows the current implementation boundary: Markdown is first projected into a transient `MarkdownBlock` graph for chunk planning and debug visibility, then table/image references are objectized and linked to narrative/derived chunks. Persisted `source_blocks`, row-group table splitting, OCR, and vision summaries are not implemented yet.
 
 ## Search
 

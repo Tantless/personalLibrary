@@ -138,10 +138,13 @@ Context Pack:
 
 Markdown artifact chunk metadata:
 
-- `chunk_kind="narrative"` chunks may include `linked_artifacts`, where each item carries `artifact_type`, `artifact_key`, `artifact_id`, `locator`, and `role`.
-- Table derived chunks use `chunk_kind="table_summary"` or `chunk_kind="table_rows"` plus `artifact_type="table"`, `artifact_key`, `artifact_id`, `artifact_locator`, and `parent_narrative_chunk_id`.
-- Image derived chunks use `chunk_kind="image_summary"` plus `artifact_type="image"`, `artifact_key`, `artifact_id`, `artifact_locator`, and `parent_narrative_chunk_id`.
+- `chunk_kind="narrative"` chunks may include `primary_block_ids` and `overlap_block_ids` from the transient Markdown block graph.
+- `chunk_kind="narrative"` chunks may include `linked_artifacts`, where each item carries `artifact_type`, `artifact_key`, `artifact_id`, `locator`, `role`, `source_block_id`, and `bound_block_ids`.
+- `linked_artifacts.role` uses `primary_reference` when the narrative chunk owns the artifact block, and `context_reference` when the artifact appears only through chunk overlap.
+- Table derived chunks use `chunk_kind="table_summary"` or `chunk_kind="table_rows"` plus `artifact_type="table"`, `artifact_key`, `artifact_id`, `artifact_locator`, `source_block_id`, `bound_block_ids`, and `parent_narrative_chunk_id`.
+- Image derived chunks use `chunk_kind="image_summary"` plus `artifact_type="image"`, `artifact_key`, `artifact_id`, `artifact_locator`, `source_block_id`, `bound_block_ids`, and `parent_narrative_chunk_id`.
 - Placeholder text such as `[Table tbl_001: ...]` is readability-only. Code must use `metadata_json` and artifact table primary keys for reliable linking.
+- Do not add persisted `source_blocks` rows for the transient graph. Persist only the block references required in existing artifact/chunk metadata unless a separate schema PRD is accepted.
 
 Full-text search:
 
@@ -313,8 +316,18 @@ Markdown artifact linking must use metadata and primary keys:
 ```python
 metadata_json={
     "chunk_kind": "narrative",
+    "primary_block_ids": ["blk_001", "blk_002"],
+    "overlap_block_ids": [],
     "linked_artifacts": [
-        {"artifact_type": "table", "artifact_key": "tbl_001", "artifact_id": table.id}
+        {
+            "artifact_type": "table",
+            "artifact_key": "tbl_001",
+            "artifact_id": table.id,
+            "locator": "line 5-8",
+            "role": "primary_reference",
+            "source_block_id": "blk_002",
+            "bound_block_ids": ["blk_002"],
+        }
     ],
 }
 ```

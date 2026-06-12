@@ -51,6 +51,7 @@ class ParsedTableArtifact:
     rows: list[dict[str, str]]
     normalized_markdown: str
     summary: str | None = None
+    metadata_json: dict[str, Any] = field(default_factory=dict)
 
     @property
     def locator(self) -> str:
@@ -67,6 +68,7 @@ class ParsedImageArtifact:
     alt_text: str | None = None
     caption: str | None = None
     nearby_text: str | None = None
+    metadata_json: dict[str, Any] = field(default_factory=dict)
 
     @property
     def locator(self) -> str:
@@ -81,6 +83,50 @@ class ParsedSource:
     chunks: list[ParsedChunk]
     table_artifacts: list[ParsedTableArtifact] = field(default_factory=list)
     image_artifacts: list[ParsedImageArtifact] = field(default_factory=list)
+    markdown_block_graph: "ParsedMarkdownBlockGraph | None" = None
+
+
+@dataclass(frozen=True)
+class ParsedMarkdownBlock:
+    block_id: str
+    block_type: str
+    line_start: int
+    line_end: int
+    heading_path: list[str]
+    raw_text: str
+    normalized_text: str | None = None
+    parent_block_id: str | None = None
+    metadata_json: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def locator(self) -> str:
+        return f"line {self.line_start}-{self.line_end}"
+
+
+@dataclass(frozen=True)
+class ParsedMarkdownBlockEdge:
+    source_block_id: str
+    target_block_id: str
+    edge_type: str
+
+
+@dataclass(frozen=True)
+class ParsedArtifactBinding:
+    artifact_type: Literal["table", "image"]
+    artifact_key: str
+    source_block_id: str
+    bound_block_ids: list[str]
+    role: str
+    locator: str
+
+
+@dataclass(frozen=True)
+class ParsedMarkdownBlockGraph:
+    title: str
+    blocks: list[ParsedMarkdownBlock]
+    edges: list[ParsedMarkdownBlockEdge] = field(default_factory=list)
+    artifact_bindings: list[ParsedArtifactBinding] = field(default_factory=list)
+    diagnostics: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -140,7 +186,11 @@ __all__ = [
     "IngestItemReport",
     "IngestReport",
     "ParsedChunk",
+    "ParsedArtifactBinding",
     "ParsedImageArtifact",
+    "ParsedMarkdownBlock",
+    "ParsedMarkdownBlockEdge",
+    "ParsedMarkdownBlockGraph",
     "ParsedSource",
     "ParsedTableArtifact",
     "source_format_name",

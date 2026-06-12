@@ -7,8 +7,12 @@ from typing import Any
 from pkcs.ingest.models import (
     KNOWLEDGE_TYPE_NAME_AI_CONVERSATION,
     KNOWLEDGE_TYPE_NAME_DOCUMENT,
+    ParsedArtifactBinding,
     ParsedChunk,
     ParsedImageArtifact,
+    ParsedMarkdownBlock,
+    ParsedMarkdownBlockEdge,
+    ParsedMarkdownBlockGraph,
     ParsedSource,
     ParsedTableArtifact,
 )
@@ -27,11 +31,11 @@ class _Section:
 
 
 @dataclass(frozen=True)
-class _RenderedEntry:
-    text: str
-    line_start: int
-    line_end: int
-    linked_artifact: dict[str, str] | None = None
+class _ChunkBlockEntry:
+    block: ParsedMarkdownBlock
+    rendered_text: str
+    linked_artifact: dict[str, Any] | None = None
+    ownership: str = "primary"
 
 
 @dataclass(frozen=True)
@@ -102,7 +106,8 @@ def _parse_document_source(*, path: Path, text: str, max_chars: int, overlap_lin
         image_artifacts: list[ParsedImageArtifact] = []
     else:
         title, sections = _markdown_sections(path=path, lines=lines)
-        chunks, table_artifacts, image_artifacts = _chunks_from_markdown_sections(
+        chunks, table_artifacts, image_artifacts, markdown_block_graph = _chunks_from_markdown_sections(
+            title=title,
             sections=sections,
             max_chars=max_chars,
             overlap_lines=overlap_lines,
@@ -121,6 +126,7 @@ def _parse_document_source(*, path: Path, text: str, max_chars: int, overlap_lin
         chunks=chunks,
         table_artifacts=table_artifacts,
         image_artifacts=image_artifacts,
+        markdown_block_graph=markdown_block_graph if path.suffix.lower() != ".txt" else None,
     )
 
 
@@ -202,100 +208,29 @@ def _chunks_from_section(
 
 def _chunks_from_markdown_sections(
     *,
+    title: str,
     sections: list[_Section],
     max_chars: int,
     overlap_lines: int,
-) -> tuple[list[ParsedChunk], list[ParsedTableArtifact], list[ParsedImageArtifact]]:
+) -> tuple[list[ParsedChunk], list[ParsedTableArtifact], list[ParsedImageArtifact], ParsedMarkdownBlockGraph]:
+    block_graph = _build_markdown_block_graph(title=title, sections=sections)
+    table_artifacts, image_artifacts, artifact_bindings, artifact_by_block_id = _artifacts_from_block_graph(
+        block_graph
+    )
+    block_graph = _block_graph_with_artifact_bindings(block_graph, artifact_bindings)
     narrative_chunks: list[ParsedChunk] = []
-    table_artifacts: list[ParsedTableArtifact] = []
-    image_artifacts: list[ParsedImageArtifact] = []
-    table_count = 0
-    image_count = 0
 
-    for section in sections:
-        entries: list[_RenderedEntry] = []
-        index = 0
-        in_fence = False
-        fence_marker: str | None = None
-
-        while index < len(section.lines):
-            line = section.lines[index]
-            absolute_line = section.line_start + index
-            fence = _fence_marker(line)
-            if fence is not None:
-                if in_fence and fence == fence_marker:
-                    in_fence = False
-                    fence_marker = None
-                elif not in_fence:
-                    in_fence = True
-                    fence_marker = fence
-                entries.append(_RenderedEntry(text=line, line_start=absolute_line, line_end=absolute_line))
-                index += 1
-                continue
-
-            if not in_fence:
-                table_end = _table_end_index(section.lines, index)
-                if table_end is not None:
-                    table_count += 1
-                    artifact_key = f"tbl_{table_count:03d}"
-                    table_lines = section.lines[index : table_end + 1]
-                    line_end = section.line_start + table_end
-                    columns, rows = _parse_table(table_lines)
-                    normalized_markdown = _normalized_table_markdown(columns, rows)
-                    artifact = ParsedTableArtifact(
-                        artifact_key=artifact_key,
-                        line_start=absolute_line,
-                        line_end=line_end,
-                        heading_path=section.heading_path,
-                        columns=columns,
-                        rows=rows,
-                        normalized_markdown=normalized_markdown,
-                        summary=_table_summary(columns=columns, rows=rows),
-                    )
-                    table_artifacts.append(artifact)
-                    entries.append(
-                        _RenderedEntry(
-                            text=_table_placeholder(artifact),
-                            line_start=artifact.line_start,
-                            line_end=artifact.line_end,
-                            linked_artifact=_linked_artifact("table", artifact.artifact_key, artifact.locator),
-                        )
-                    )
-                    index = table_end + 1
-                    continue
-
-                image_match = _IMAGE_LINE_RE.match(line)
-                if image_match:
-                    image_count += 1
-                    artifact_key = f"img_{image_count:03d}"
-                    original_uri = _parse_image_uri(image_match.group(2))
-                    artifact = ParsedImageArtifact(
-                        artifact_key=artifact_key,
-                        line_start=absolute_line,
-                        line_end=absolute_line,
-                        heading_path=section.heading_path,
-                        original_uri=original_uri,
-                        alt_text=_optional_str(image_match.group(1)),
-                        nearby_text=_nearby_text_for_image(entries=entries, lines=section.lines, image_index=index),
-                    )
-                    image_artifacts.append(artifact)
-                    entries.append(
-                        _RenderedEntry(
-                            text=_image_placeholder(artifact),
-                            line_start=artifact.line_start,
-                            line_end=artifact.line_end,
-                            linked_artifact=_linked_artifact("image", artifact.artifact_key, artifact.locator),
-                        )
-                    )
-                    index += 1
-                    continue
-
-            entries.append(_RenderedEntry(text=line, line_start=absolute_line, line_end=absolute_line))
-            index += 1
-
+    for section_index, section in enumerate(sections):
+        section_blocks = [
+            block
+            for block in block_graph.blocks
+            if block.metadata_json.get("section_index") == section_index
+        ]
+        entries = _rendered_block_entries(blocks=section_blocks, artifact_by_block_id=artifact_by_block_id)
         narrative_chunks.extend(
-            _narrative_chunks_from_entries(
-                section=section,
+            _narrative_chunks_from_blocks(
+                section_title=section.title,
+                section_heading_path=section.heading_path,
                 entries=entries,
                 start_index=len(narrative_chunks),
                 max_chars=max_chars,
@@ -304,6 +239,14 @@ def _chunks_from_markdown_sections(
         )
 
     parent_chunk_by_artifact_key: dict[str, str] = {}
+    for chunk in narrative_chunks:
+        chunk_key = chunk.chunk_key or ""
+        for artifact_ref in chunk.metadata_json.get("linked_artifacts", []):
+            if artifact_ref.get("role") != "primary_reference":
+                continue
+            artifact_key = artifact_ref.get("artifact_key")
+            if artifact_key and artifact_key not in parent_chunk_by_artifact_key:
+                parent_chunk_by_artifact_key[artifact_key] = chunk_key
     for chunk in narrative_chunks:
         chunk_key = chunk.chunk_key or ""
         for artifact_ref in chunk.metadata_json.get("linked_artifacts", []):
@@ -316,36 +259,372 @@ def _chunks_from_markdown_sections(
         image_artifacts=image_artifacts,
         parent_chunk_by_artifact_key=parent_chunk_by_artifact_key,
     )
-    return [*narrative_chunks, *artifact_chunks], table_artifacts, image_artifacts
+    return [*narrative_chunks, *artifact_chunks], table_artifacts, image_artifacts, block_graph
 
 
-def _narrative_chunks_from_entries(
+def _build_markdown_block_graph(*, title: str, sections: list[_Section]) -> ParsedMarkdownBlockGraph:
+    blocks: list[ParsedMarkdownBlock] = []
+    edges: list[ParsedMarkdownBlockEdge] = []
+    diagnostics: list[dict[str, Any]] = []
+    previous_block_id: str | None = None
+
+    for section_index, section in enumerate(sections):
+        index = 0
+        while index < len(section.lines):
+            line = section.lines[index]
+            absolute_line = section.line_start + index
+            fence = _fence_marker(line)
+            if fence is not None:
+                end_index = _code_fence_end_index(section.lines, index, fence)
+                block_lines = section.lines[index : end_index + 1]
+                block = _markdown_block(
+                    block_index=len(blocks),
+                    block_type="code_fence",
+                    line_start=absolute_line,
+                    line_end=section.line_start + end_index,
+                    heading_path=section.heading_path,
+                    raw_text="\n".join(block_lines),
+                    metadata_json={
+                        "section_index": section_index,
+                        "section_title": section.title,
+                        "fence_marker": fence,
+                    },
+                )
+                blocks.append(block)
+                previous_block_id = _append_follows_edge(edges, previous_block_id, block.block_id)
+                index = end_index + 1
+                continue
+
+            table_end = _table_end_index(section.lines, index)
+            if table_end is not None:
+                table_lines = section.lines[index : table_end + 1]
+                columns, rows = _parse_table(table_lines)
+                normalized_markdown = _normalized_table_markdown(columns, rows)
+                block = _markdown_block(
+                    block_index=len(blocks),
+                    block_type="table",
+                    line_start=absolute_line,
+                    line_end=section.line_start + table_end,
+                    heading_path=section.heading_path,
+                    raw_text="\n".join(table_lines),
+                    normalized_text=normalized_markdown,
+                    metadata_json={
+                        "section_index": section_index,
+                        "section_title": section.title,
+                        "columns": columns,
+                        "rows": rows,
+                        "row_count": len(rows),
+                        "summary": _table_summary(columns=columns, rows=rows),
+                    },
+                )
+                blocks.append(block)
+                previous_block_id = _append_follows_edge(edges, previous_block_id, block.block_id)
+                index = table_end + 1
+                continue
+
+            image_match = _IMAGE_LINE_RE.match(line)
+            if image_match:
+                original_uri = _parse_image_uri(image_match.group(2))
+                block = _markdown_block(
+                    block_index=len(blocks),
+                    block_type="image",
+                    line_start=absolute_line,
+                    line_end=absolute_line,
+                    heading_path=section.heading_path,
+                    raw_text=line,
+                    normalized_text=original_uri,
+                    metadata_json={
+                        "section_index": section_index,
+                        "section_title": section.title,
+                        "image_syntax": "markdown_image",
+                        "original_uri": original_uri,
+                        "alt_text": _optional_str(image_match.group(1)),
+                    },
+                )
+                blocks.append(block)
+                previous_block_id = _append_follows_edge(edges, previous_block_id, block.block_id)
+                index += 1
+                continue
+
+            block_type = _markdown_text_block_type(line)
+            diagnostics.extend(_markdown_block_diagnostics(line=line, line_no=absolute_line))
+            block = _markdown_block(
+                block_index=len(blocks),
+                block_type=block_type,
+                line_start=absolute_line,
+                line_end=absolute_line,
+                heading_path=section.heading_path,
+                raw_text=line,
+                metadata_json={
+                    "section_index": section_index,
+                    "section_title": section.title,
+                },
+            )
+            blocks.append(block)
+            previous_block_id = _append_follows_edge(edges, previous_block_id, block.block_id)
+            index += 1
+
+    return ParsedMarkdownBlockGraph(title=title, blocks=blocks, edges=edges, diagnostics=diagnostics)
+
+
+def _markdown_block(
     *,
-    section: _Section,
-    entries: list[_RenderedEntry],
+    block_index: int,
+    block_type: str,
+    line_start: int,
+    line_end: int,
+    heading_path: list[str],
+    raw_text: str,
+    normalized_text: str | None = None,
+    metadata_json: dict[str, Any] | None = None,
+) -> ParsedMarkdownBlock:
+    return ParsedMarkdownBlock(
+        block_id=f"blk_{block_index + 1:03d}",
+        block_type=block_type,
+        line_start=line_start,
+        line_end=line_end,
+        heading_path=heading_path,
+        raw_text=raw_text,
+        normalized_text=normalized_text,
+        metadata_json=metadata_json or {},
+    )
+
+
+def _append_follows_edge(
+    edges: list[ParsedMarkdownBlockEdge],
+    previous_block_id: str | None,
+    block_id: str,
+) -> str:
+    if previous_block_id is not None:
+        edges.append(
+            ParsedMarkdownBlockEdge(
+                source_block_id=previous_block_id,
+                target_block_id=block_id,
+                edge_type="follows",
+            )
+        )
+    return block_id
+
+
+def _code_fence_end_index(lines: list[str], start_index: int, fence_marker: str) -> int:
+    index = start_index + 1
+    while index < len(lines):
+        if _fence_marker(lines[index]) == fence_marker:
+            return index
+        index += 1
+    return len(lines) - 1
+
+
+def _markdown_text_block_type(line: str) -> str:
+    stripped = line.strip()
+    if not stripped:
+        return "blank"
+    if _HEADING_RE.match(line):
+        return "heading"
+    if stripped.startswith(">"):
+        return "blockquote"
+    if re.match(r"^(\s*([-*+]|\d+[.)])\s+)", line):
+        return "list"
+    if stripped in {"---", "***", "___"}:
+        return "thematic_break"
+    if stripped.startswith("<"):
+        return "html"
+    return "paragraph"
+
+
+def _markdown_block_diagnostics(*, line: str, line_no: int) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    stripped = line.strip()
+    if "[![" in stripped:
+        diagnostics.append(
+            {
+                "line": line_no,
+                "code": "unsupported_linked_markdown_image",
+                "message": "Linked Markdown image remains paragraph text in this task.",
+            }
+        )
+    if "<img" in stripped.lower():
+        diagnostics.append(
+            {
+                "line": line_no,
+                "code": "unsupported_html_image",
+                "message": "HTML image remains HTML/text block in this task.",
+            }
+        )
+    return diagnostics
+
+
+def _artifacts_from_block_graph(
+    graph: ParsedMarkdownBlockGraph,
+) -> tuple[
+    list[ParsedTableArtifact],
+    list[ParsedImageArtifact],
+    list[ParsedArtifactBinding],
+    dict[str, ParsedTableArtifact | ParsedImageArtifact],
+]:
+    table_artifacts: list[ParsedTableArtifact] = []
+    image_artifacts: list[ParsedImageArtifact] = []
+    artifact_bindings: list[ParsedArtifactBinding] = []
+    artifact_by_block_id: dict[str, ParsedTableArtifact | ParsedImageArtifact] = {}
+
+    for block_index, block in enumerate(graph.blocks):
+        if block.block_type == "table":
+            artifact_key = f"tbl_{len(table_artifacts) + 1:03d}"
+            columns = _list_metadata(block.metadata_json.get("columns"))
+            rows = _rows_metadata(block.metadata_json.get("rows"))
+            normalized_markdown = block.normalized_text or _normalized_table_markdown(columns, rows)
+            artifact = ParsedTableArtifact(
+                artifact_key=artifact_key,
+                line_start=block.line_start,
+                line_end=block.line_end,
+                heading_path=block.heading_path,
+                columns=columns,
+                rows=rows,
+                normalized_markdown=normalized_markdown,
+                summary=_optional_str(block.metadata_json.get("summary"))
+                or _table_summary(columns=columns, rows=rows),
+                metadata_json={
+                    "source_block_id": block.block_id,
+                    "bound_block_ids": [block.block_id],
+                    "source_block_type": block.block_type,
+                },
+            )
+            table_artifacts.append(artifact)
+            artifact_by_block_id[block.block_id] = artifact
+            artifact_bindings.append(_artifact_binding("table", artifact, block))
+            continue
+
+        if block.block_type == "image":
+            artifact_key = f"img_{len(image_artifacts) + 1:03d}"
+            nearby_text = _nearby_text_for_image_block(blocks=graph.blocks, image_index=block_index)
+            artifact = ParsedImageArtifact(
+                artifact_key=artifact_key,
+                line_start=block.line_start,
+                line_end=block.line_end,
+                heading_path=block.heading_path,
+                original_uri=str(block.metadata_json["original_uri"]),
+                alt_text=_optional_str(block.metadata_json.get("alt_text")),
+                nearby_text=nearby_text,
+                metadata_json={
+                    "source_block_id": block.block_id,
+                    "bound_block_ids": [block.block_id],
+                    "source_block_type": block.block_type,
+                    "image_syntax": block.metadata_json.get("image_syntax"),
+                },
+            )
+            image_artifacts.append(artifact)
+            artifact_by_block_id[block.block_id] = artifact
+            artifact_bindings.append(_artifact_binding("image", artifact, block))
+
+    return table_artifacts, image_artifacts, artifact_bindings, artifact_by_block_id
+
+
+def _artifact_binding(
+    artifact_type: str,
+    artifact: ParsedTableArtifact | ParsedImageArtifact,
+    block: ParsedMarkdownBlock,
+) -> ParsedArtifactBinding:
+    return ParsedArtifactBinding(
+        artifact_type=artifact_type,  # type: ignore[arg-type]
+        artifact_key=artifact.artifact_key,
+        source_block_id=block.block_id,
+        bound_block_ids=[block.block_id],
+        role="primary",
+        locator=artifact.locator,
+    )
+
+
+def _block_graph_with_artifact_bindings(
+    graph: ParsedMarkdownBlockGraph,
+    artifact_bindings: list[ParsedArtifactBinding],
+) -> ParsedMarkdownBlockGraph:
+    return ParsedMarkdownBlockGraph(
+        title=graph.title,
+        blocks=graph.blocks,
+        edges=graph.edges,
+        artifact_bindings=artifact_bindings,
+        diagnostics=graph.diagnostics,
+    )
+
+
+def _rendered_block_entries(
+    *,
+    blocks: list[ParsedMarkdownBlock],
+    artifact_by_block_id: dict[str, ParsedTableArtifact | ParsedImageArtifact],
+) -> list[_ChunkBlockEntry]:
+    entries: list[_ChunkBlockEntry] = []
+    for block in blocks:
+        artifact = artifact_by_block_id.get(block.block_id)
+        if isinstance(artifact, ParsedTableArtifact):
+            entries.append(
+                _ChunkBlockEntry(
+                    block=block,
+                    rendered_text=_table_placeholder(artifact),
+                    linked_artifact=_linked_artifact(
+                        artifact_type="table",
+                        artifact_key=artifact.artifact_key,
+                        locator=artifact.locator,
+                        source_block_id=block.block_id,
+                        bound_block_ids=[block.block_id],
+                    ),
+                )
+            )
+            continue
+        if isinstance(artifact, ParsedImageArtifact):
+            entries.append(
+                _ChunkBlockEntry(
+                    block=block,
+                    rendered_text=_image_placeholder(artifact),
+                    linked_artifact=_linked_artifact(
+                        artifact_type="image",
+                        artifact_key=artifact.artifact_key,
+                        locator=artifact.locator,
+                        source_block_id=block.block_id,
+                        bound_block_ids=[block.block_id],
+                    ),
+                )
+            )
+            continue
+        entries.append(_ChunkBlockEntry(block=block, rendered_text=block.raw_text))
+    return entries
+
+
+def _narrative_chunks_from_blocks(
+    *,
+    section_title: str,
+    section_heading_path: list[str],
+    entries: list[_ChunkBlockEntry],
     start_index: int,
     max_chars: int,
     overlap_lines: int,
 ) -> list[ParsedChunk]:
     chunks: list[ParsedChunk] = []
-    current: list[_RenderedEntry] = []
+    current: list[_ChunkBlockEntry] = []
 
     for entry in entries:
-        candidate = current + [entry]
-        if current and len(_entries_text(candidate)) > max_chars:
-            chunk = _chunk_from_entries(
-                section=section,
+        primary_entry = _ChunkBlockEntry(
+            block=entry.block,
+            rendered_text=entry.rendered_text,
+            linked_artifact=entry.linked_artifact,
+            ownership="primary",
+        )
+        candidate = current + [primary_entry]
+        if current and len(_block_entries_text(candidate)) > max_chars:
+            chunk = _chunk_from_block_entries(
+                section_title=section_title,
+                section_heading_path=section_heading_path,
                 entries=current,
                 chunk_key=f"narrative_{start_index + len(chunks) + 1:03d}",
             )
             if chunk is not None:
                 chunks.append(chunk)
-            current = current[-overlap_lines:].copy() if overlap_lines else []
-        current.append(entry)
+            current = [_overlap_entry(item) for item in current[-overlap_lines:]] if overlap_lines else []
+        current.append(primary_entry)
 
     if current:
-        chunk = _chunk_from_entries(
-            section=section,
+        chunk = _chunk_from_block_entries(
+            section_title=section_title,
+            section_heading_path=section_heading_path,
             entries=current,
             chunk_key=f"narrative_{start_index + len(chunks) + 1:03d}",
         )
@@ -354,22 +633,43 @@ def _narrative_chunks_from_entries(
     return chunks
 
 
-def _chunk_from_entries(*, section: _Section, entries: list[_RenderedEntry], chunk_key: str) -> ParsedChunk | None:
-    content = _entries_text(entries).strip()
+def _overlap_entry(entry: _ChunkBlockEntry) -> _ChunkBlockEntry:
+    return _ChunkBlockEntry(
+        block=entry.block,
+        rendered_text=entry.rendered_text,
+        linked_artifact=entry.linked_artifact,
+        ownership="overlap",
+    )
+
+
+def _chunk_from_block_entries(
+    *,
+    section_title: str,
+    section_heading_path: list[str],
+    entries: list[_ChunkBlockEntry],
+    chunk_key: str,
+) -> ParsedChunk | None:
+    content = _block_entries_text(entries).strip()
     if not content:
         return None
-    linked_artifacts = [entry.linked_artifact for entry in entries if entry.linked_artifact is not None]
+    linked_artifacts = [
+        _linked_artifact_for_chunk(entry)
+        for entry in entries
+        if entry.linked_artifact is not None
+    ]
     return ParsedChunk(
-        title=section.title,
+        title=section_title,
         content=content,
-        line_start=entries[0].line_start,
-        line_end=entries[-1].line_end,
-        heading_path=section.heading_path,
+        line_start=entries[0].block.line_start,
+        line_end=entries[-1].block.line_end,
+        heading_path=section_heading_path,
         chunk_key=chunk_key,
         metadata_json={
             "knowledge_type": KNOWLEDGE_TYPE_NAME_DOCUMENT,
-            "heading_path": section.heading_path,
+            "heading_path": section_heading_path,
             "chunk_kind": "narrative",
+            "primary_block_ids": _block_ids_by_ownership(entries, "primary"),
+            "overlap_block_ids": _block_ids_by_ownership(entries, "overlap"),
             "linked_artifacts": linked_artifacts,
         },
     )
@@ -397,6 +697,8 @@ def _artifact_chunks(
                     chunk_kind="table_summary",
                     locator=artifact.locator,
                     heading_path=artifact.heading_path,
+                    source_block_id=_optional_str(artifact.metadata_json.get("source_block_id")),
+                    bound_block_ids=_list_metadata(artifact.metadata_json.get("bound_block_ids")),
                     parent_chunk_by_artifact_key=parent_chunk_by_artifact_key,
                 ),
             )
@@ -415,6 +717,8 @@ def _artifact_chunks(
                     chunk_kind="table_rows",
                     locator=artifact.locator,
                     heading_path=artifact.heading_path,
+                    source_block_id=_optional_str(artifact.metadata_json.get("source_block_id")),
+                    bound_block_ids=_list_metadata(artifact.metadata_json.get("bound_block_ids")),
                     parent_chunk_by_artifact_key=parent_chunk_by_artifact_key,
                 ),
             )
@@ -435,6 +739,8 @@ def _artifact_chunks(
                     chunk_kind="image_summary",
                     locator=artifact.locator,
                     heading_path=artifact.heading_path,
+                    source_block_id=_optional_str(artifact.metadata_json.get("source_block_id")),
+                    bound_block_ids=_list_metadata(artifact.metadata_json.get("bound_block_ids")),
                     parent_chunk_by_artifact_key=parent_chunk_by_artifact_key,
                 ),
             )
@@ -550,13 +856,38 @@ def _image_placeholder(artifact: ParsedImageArtifact) -> str:
     return f"[Image {artifact.artifact_key}: {label}, {artifact.locator}]"
 
 
-def _linked_artifact(artifact_type: str, artifact_key: str, locator: str) -> dict[str, str]:
+def _linked_artifact(
+    *,
+    artifact_type: str,
+    artifact_key: str,
+    locator: str,
+    source_block_id: str,
+    bound_block_ids: list[str],
+) -> dict[str, Any]:
     return {
         "artifact_type": artifact_type,
         "artifact_key": artifact_key,
         "locator": locator,
-        "role": "inline_reference",
+        "source_block_id": source_block_id,
+        "bound_block_ids": bound_block_ids,
+        "role": "primary_reference",
     }
+
+
+def _linked_artifact_for_chunk(entry: _ChunkBlockEntry) -> dict[str, Any]:
+    if entry.linked_artifact is None:
+        return {}
+    linked = dict(entry.linked_artifact)
+    linked["role"] = "context_reference" if entry.ownership == "overlap" else "primary_reference"
+    return linked
+
+
+def _block_ids_by_ownership(entries: list[_ChunkBlockEntry], ownership: str) -> list[str]:
+    return [
+        entry.block.block_id
+        for entry in entries
+        if entry.ownership == ownership and entry.block.block_type != "blank"
+    ]
 
 
 def _artifact_chunk_metadata(
@@ -566,17 +897,23 @@ def _artifact_chunk_metadata(
     chunk_kind: str,
     locator: str,
     heading_path: list[str],
+    source_block_id: str | None,
+    bound_block_ids: list[str],
     parent_chunk_by_artifact_key: dict[str, str],
 ) -> dict[str, Any]:
-    return {
+    metadata = {
         "knowledge_type": KNOWLEDGE_TYPE_NAME_DOCUMENT,
         "heading_path": heading_path,
         "chunk_kind": chunk_kind,
         "artifact_type": artifact_type,
         "artifact_key": artifact_key,
         "artifact_locator": locator,
+        "bound_block_ids": bound_block_ids,
         "parent_narrative_chunk_key": parent_chunk_by_artifact_key.get(artifact_key),
     }
+    if source_block_id is not None:
+        metadata["source_block_id"] = source_block_id
+    return metadata
 
 
 def _artifact_title(heading_path: list[str], artifact_key: str) -> str:
@@ -585,8 +922,8 @@ def _artifact_title(heading_path: list[str], artifact_key: str) -> str:
     return artifact_key
 
 
-def _entries_text(entries: list[_RenderedEntry]) -> str:
-    return "\n".join(entry.text for entry in entries)
+def _block_entries_text(entries: list[_ChunkBlockEntry]) -> str:
+    return "\n".join(entry.rendered_text for entry in entries)
 
 
 def _parse_image_uri(raw_uri: str) -> str:
@@ -598,18 +935,40 @@ def _parse_image_uri(raw_uri: str) -> str:
     return uri.strip("<>")
 
 
-def _nearby_text_for_image(*, entries: list[_RenderedEntry], lines: list[str], image_index: int) -> str | None:
+def _nearby_text_for_image_block(*, blocks: list[ParsedMarkdownBlock], image_index: int) -> str | None:
     candidates: list[str] = []
-    for entry in reversed(entries):
-        text = entry.text.strip()
+    for block in reversed(blocks[:image_index]):
+        if block.block_type == "blank":
+            continue
+        text = block.raw_text.strip()
         if text:
             candidates.append(text)
             break
-    if image_index + 1 < len(lines):
-        next_text = lines[image_index + 1].strip()
+    for block in blocks[image_index + 1 :]:
+        if block.block_type == "blank":
+            continue
+        next_text = block.raw_text.strip()
         if next_text:
             candidates.append(next_text)
+            break
     return _optional_str(" ".join(candidates))
+
+
+def _list_metadata(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if isinstance(item, str)]
+
+
+def _rows_metadata(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    rows: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        rows.append({str(key): str(row_value) for key, row_value in item.items()})
+    return rows
 
 
 def _safe_table_cell(value: str) -> str:

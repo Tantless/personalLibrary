@@ -49,7 +49,8 @@ src/pkcs/
 - Interface layers (`cli.py`, `mcp/server.py`, future HTTP routes) must call application services.
 - Application services own transaction orchestration, input validation, and cross-repository workflows.
 - Parsers return plain data models and must not write to the database or filesystem.
-- Markdown artifact-aware parsers return `ParsedChunk`, `ParsedTableArtifact`, and `ParsedImageArtifact`; they do not create ORM rows or copy image assets.
+- Markdown artifact-aware parsers return `ParsedChunk`, `ParsedTableArtifact`, `ParsedImageArtifact`, and an optional transient `ParsedMarkdownBlockGraph`; they do not create ORM rows or copy image assets.
+- `ParsedMarkdownBlockGraph` is an ingest/chunk-planning debug contract only. It may be exposed by `trace-ingest`, but it must not create a `source_blocks` table, repository, search API, or read API without a separate PRD.
 - Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
 - Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.
 - Context Pack services own retrieval orchestration, lightweight artifact hydration, and Markdown rendering; they call `SearchService` and `ReadSourceService`, and use artifact repositories only to hydrate already-selected evidence.

@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 from pkcs.cli import app as cli_app
 from pkcs.config import get_settings
 from pkcs.ingest import ArtifactIngestTraceService
+from pkcs.ingest.parsers import parse_source_file
 from pkcs.storage.raw_archive import RawArchiveWriter
 
 
@@ -50,10 +51,15 @@ def test_artifact_ingest_trace_outputs_parse_to_database_flow(db_session, tmp_pa
         canonical_key=f"document:trace-{token}",
     )
 
-    assert trace["trace_version"] == "artifact_ingest_trace_v1"
-    assert trace["stage_order"] == ["input", "parser", "asset_resolution", "ingest_report", "database"]
-    assert "Explicit public MarkdownBlock AST" in " ".join(trace["design_delta"]["not_yet_implemented"])
+    assert trace["trace_version"] == "artifact_ingest_trace_v2"
+    assert trace["stage_order"] == ["input", "block_graph", "parser", "asset_resolution", "ingest_report", "database"]
+    assert "Transient explicit MarkdownBlock graph" in " ".join(trace["design_delta"]["implemented"])
+    assert "Persisted source_blocks table" in " ".join(trace["design_delta"]["not_yet_implemented"])
     assert trace["input"]["line_count"] >= 10
+    assert trace["block_graph"]["available"] is True
+    assert trace["block_graph"]["counts"]["block_types"]["table"] == 1
+    assert trace["block_graph"]["counts"]["block_types"]["image"] == 1
+    assert trace["block_graph"]["counts"]["artifact_bindings"] == 2
     assert trace["parser"]["counts"]["table_artifacts"] == 1
     assert trace["parser"]["counts"]["image_artifacts"] == 1
     assert trace["parser"]["counts"]["table_derived_chunks"] == 2
@@ -83,10 +89,60 @@ def test_artifact_ingest_trace_outputs_parse_to_database_flow(db_session, tmp_pa
     assert all(item["artifact_id"] for item in narrative["linked_artifacts"])
     assert table_rows["artifact_type"] == "table"
     assert table_rows["artifact_id"]
+    assert table_rows["source_block_id"]
+    assert table_rows["bound_block_ids"]
     assert table_rows["parent_narrative_chunk_id"] == narrative["id"]
     assert image_summary["artifact_type"] == "image"
     assert image_summary["artifact_id"]
+    assert image_summary["source_block_id"]
+    assert image_summary["bound_block_ids"]
     assert image_summary["parent_narrative_chunk_id"] == narrative["id"]
+
+
+def test_markdown_block_graph_marks_overlap_artifact_links_as_context(tmp_path) -> None:
+    source_path = tmp_path / "overlap.md"
+    source_path.write_text(
+        "# Overlap\n"
+        "Intro before table.\n"
+        "| A | B |\n"
+        "| --- | --- |\n"
+        "| x | y |\n"
+        "This following paragraph is intentionally long enough to force a second chunk while the table placeholder is retained as overlap context.\n",
+        encoding="utf-8",
+    )
+
+    parsed = parse_source_file(
+        path=source_path,
+        knowledge_type="document",
+        content_bytes=source_path.read_bytes(),
+        max_chars=90,
+        overlap_lines=1,
+    )
+
+    graph = parsed.markdown_block_graph
+    assert graph is not None
+    assert [block.block_type for block in graph.blocks].count("table") == 1
+    assert graph.artifact_bindings[0].source_block_id
+
+    narrative_chunks = [chunk for chunk in parsed.chunks if chunk.metadata_json.get("chunk_kind") == "narrative"]
+    primary_chunk = next(
+        chunk
+        for chunk in narrative_chunks
+        if any(ref["role"] == "primary_reference" for ref in chunk.metadata_json["linked_artifacts"])
+    )
+    context_chunk = next(
+        chunk
+        for chunk in narrative_chunks
+        if any(ref["role"] == "context_reference" for ref in chunk.metadata_json["linked_artifacts"])
+    )
+    table_rows = next(chunk for chunk in parsed.chunks if chunk.metadata_json.get("chunk_kind") == "table_rows")
+
+    primary_ref = primary_chunk.metadata_json["linked_artifacts"][0]
+    context_ref = context_chunk.metadata_json["linked_artifacts"][0]
+    assert primary_ref["source_block_id"] == context_ref["source_block_id"]
+    assert primary_ref["source_block_id"] in primary_chunk.metadata_json["primary_block_ids"]
+    assert context_ref["source_block_id"] in context_chunk.metadata_json["overlap_block_ids"]
+    assert table_rows.metadata_json["parent_narrative_chunk_key"] == primary_chunk.chunk_key
 
 
 def test_cli_trace_ingest_outputs_trace(monkeypatch, migrated_database_url, tmp_path) -> None:
@@ -116,7 +172,8 @@ def test_cli_trace_ingest_outputs_trace(monkeypatch, migrated_database_url, tmp_
     stdout = json.loads(result.stdout)
     body = json.loads(output_path.read_text(encoding="utf-8"))
     assert stdout == {"status": "written", "output": str(output_path)}
-    assert body["trace_version"] == "artifact_ingest_trace_v1"
+    assert body["trace_version"] == "artifact_ingest_trace_v2"
+    assert body["block_graph"]["available"] is True
     assert body["parser"]["counts"]["table_artifacts"] == 1
     assert body["database"]["counts"]["image_artifacts"] == 1
     assert body["database"]["link_checks"]["artifact_chunks_with_artifact_id"] == 3

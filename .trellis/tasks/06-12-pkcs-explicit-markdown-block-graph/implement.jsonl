@@ -1,0 +1,4 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis\\spec\\backend\\database-guidelines.md", "reason": "Artifact chunk metadata contract and no source_blocks migration decision"}
+{"file": ".trellis\\spec\\backend\\directory-structure.md", "reason": "Parser/service boundaries for transient block graph implementation"}

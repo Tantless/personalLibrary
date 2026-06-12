@@ -8,7 +8,14 @@ from sqlalchemy.orm import Session
 from pkcs.config import Settings, get_settings
 from pkcs.db.models import Chunk, Citation, ImageArtifact, Source, SourceVersion, TableArtifact
 from pkcs.db.session import create_session_factory
-from pkcs.ingest.models import ParsedChunk, ParsedImageArtifact, ParsedSource, ParsedTableArtifact
+from pkcs.ingest.models import (
+    ParsedArtifactBinding,
+    ParsedChunk,
+    ParsedImageArtifact,
+    ParsedMarkdownBlockGraph,
+    ParsedSource,
+    ParsedTableArtifact,
+)
 from pkcs.ingest.parsers import parse_source_file
 from pkcs.ingest.service import IngestService, SessionFactory
 from pkcs.source_metadata import (
@@ -86,10 +93,11 @@ class ArtifactIngestTraceService:
         )
 
         return {
-            "trace_version": "artifact_ingest_trace_v1",
+            "trace_version": "artifact_ingest_trace_v2",
             "design_delta": _design_delta(),
             "stage_order": [
                 "input",
+                "block_graph",
                 "parser",
                 "asset_resolution",
                 "ingest_report",
@@ -103,6 +111,7 @@ class ArtifactIngestTraceService:
                 source_format_code=source_format_code,
                 normalized_format_code=normalized_format_code,
             ),
+            "block_graph": _block_graph_trace(parsed.markdown_block_graph),
             "parser": _parsed_source_trace(parsed),
             "asset_resolution": _asset_resolution_trace(source_path=resolved_path, parsed=parsed),
             "ingest_report": report.to_dict(),
@@ -198,6 +207,72 @@ def _input_trace(
     }
 
 
+def _block_graph_trace(graph: ParsedMarkdownBlockGraph | None) -> dict[str, Any]:
+    if graph is None:
+        return {"available": False, "reason": "source format did not produce a Markdown block graph"}
+
+    block_type_counts: dict[str, int] = {}
+    for block in graph.blocks:
+        block_type_counts[block.block_type] = block_type_counts.get(block.block_type, 0) + 1
+
+    return {
+        "available": True,
+        "title": graph.title,
+        "counts": {
+            "blocks": len(graph.blocks),
+            "edges": len(graph.edges),
+            "artifact_bindings": len(graph.artifact_bindings),
+            "diagnostics": len(graph.diagnostics),
+            "block_types": block_type_counts,
+        },
+        "blocks": [
+            {
+                "block_id": block.block_id,
+                "block_type": block.block_type,
+                "locator": block.locator,
+                "line_start": block.line_start,
+                "line_end": block.line_end,
+                "heading_path": block.heading_path,
+                "parent_block_id": block.parent_block_id,
+                "raw_text_preview": _preview(block.raw_text),
+                "normalized_text_preview": _preview(block.normalized_text or "") if block.normalized_text else None,
+                "metadata": _block_metadata_trace(block.metadata_json),
+            }
+            for block in graph.blocks
+        ],
+        "edges": [
+            {
+                "source_block_id": edge.source_block_id,
+                "target_block_id": edge.target_block_id,
+                "edge_type": edge.edge_type,
+            }
+            for edge in graph.edges
+        ],
+        "artifact_bindings": [_artifact_binding_trace(binding) for binding in graph.artifact_bindings],
+        "diagnostics": graph.diagnostics,
+    }
+
+
+def _block_metadata_trace(metadata: dict[str, Any]) -> dict[str, Any]:
+    traced = dict(metadata)
+    rows = traced.pop("rows", None)
+    if isinstance(rows, list):
+        traced["row_count"] = len(rows)
+        traced["row_preview"] = rows[:3]
+    return traced
+
+
+def _artifact_binding_trace(binding: ParsedArtifactBinding) -> dict[str, Any]:
+    return {
+        "artifact_type": binding.artifact_type,
+        "artifact_key": binding.artifact_key,
+        "source_block_id": binding.source_block_id,
+        "bound_block_ids": binding.bound_block_ids,
+        "role": binding.role,
+        "locator": binding.locator,
+    }
+
+
 def _parsed_source_trace(parsed: ParsedSource) -> dict[str, Any]:
     return {
         "title": parsed.title,
@@ -232,6 +307,7 @@ def _parsed_table_trace(artifact: ParsedTableArtifact) -> dict[str, Any]:
         "row_count": len(artifact.rows),
         "row_preview": artifact.rows[:3],
         "summary": artifact.summary,
+        "metadata": artifact.metadata_json,
         "normalized_markdown_preview": _preview(artifact.normalized_markdown),
     }
 
@@ -247,6 +323,7 @@ def _parsed_image_trace(artifact: ParsedImageArtifact) -> dict[str, Any]:
         "alt_text": artifact.alt_text,
         "caption": artifact.caption,
         "nearby_text": artifact.nearby_text,
+        "metadata": artifact.metadata_json,
     }
 
 
@@ -263,6 +340,10 @@ def _parsed_chunk_trace(chunk: ParsedChunk) -> dict[str, Any]:
         "line_start": chunk.line_start,
         "line_end": chunk.line_end,
         "heading_path": chunk.heading_path,
+        "primary_block_ids": metadata.get("primary_block_ids", []),
+        "overlap_block_ids": metadata.get("overlap_block_ids", []),
+        "source_block_id": metadata.get("source_block_id"),
+        "bound_block_ids": metadata.get("bound_block_ids", []),
         "linked_artifacts": metadata.get("linked_artifacts", []),
         "metadata": metadata,
         "content_preview": _preview(chunk.content),
@@ -350,6 +431,10 @@ def _chunk_row_trace(chunk: Chunk) -> dict[str, Any]:
         "line_start": chunk.line_start,
         "line_end": chunk.line_end,
         "heading_path": chunk.heading_path,
+        "primary_block_ids": metadata.get("primary_block_ids", []),
+        "overlap_block_ids": metadata.get("overlap_block_ids", []),
+        "source_block_id": metadata.get("source_block_id"),
+        "bound_block_ids": metadata.get("bound_block_ids", []),
         "linked_artifacts": metadata.get("linked_artifacts", []),
         "metadata": metadata,
         "content_preview": _preview(chunk.content),
@@ -369,6 +454,8 @@ def _link_checks(*, chunks: list[Chunk]) -> dict[str, Any]:
     return {
         "linked_artifacts_count": len(linked_refs),
         "linked_artifacts_with_artifact_id": sum(1 for ref in linked_refs if ref.get("artifact_id")),
+        "primary_linked_artifacts_count": sum(1 for ref in linked_refs if ref.get("role") == "primary_reference"),
+        "context_linked_artifacts_count": sum(1 for ref in linked_refs if ref.get("role") == "context_reference"),
         "artifact_chunks_count": len(artifact_chunks),
         "artifact_chunks_with_artifact_id": sum(1 for chunk in artifact_chunks if chunk.metadata_json.get("artifact_id")),
         "artifact_chunks_with_parent_narrative_chunk_id": sum(
@@ -381,16 +468,18 @@ def _design_delta() -> dict[str, Any]:
     return {
         "implemented": [
             "Markdown section scanning by heading.",
-            "Implicit block stream via rendered entries.",
+            "Transient explicit MarkdownBlock graph for parser/chunk planning.",
             "Atomic Markdown table and single-line image reference detection.",
             "Table/image parsed artifacts.",
             "Narrative placeholders plus metadata linked_artifacts.",
+            "Primary/context artifact link roles for block overlap.",
             "Artifact-derived chunks for retrieval.",
             "Database rows for table_artifacts and image_artifacts.",
             "Metadata ID resolution after artifact rows and narrative chunks are flushed.",
         ],
         "not_yet_implemented": [
-            "Explicit public MarkdownBlock AST with text/table/image block classes.",
+            "Persisted source_blocks table or block-level query/read API.",
+            "Full public MarkdownBlock AST as an external API contract.",
             "Large table row-group chunk splitting.",
             "Image OCR or vision summary enrichment.",
             "PDF/HTML/docx artifact extraction.",

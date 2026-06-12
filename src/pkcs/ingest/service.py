@@ -342,7 +342,11 @@ class IngestService:
                 rows=artifact.rows,
                 normalized_markdown=artifact.normalized_markdown,
                 summary=artifact.summary,
-                metadata_json={"artifact_key": artifact.artifact_key, "artifact_type": "table"},
+                metadata_json={
+                    **artifact.metadata_json,
+                    "artifact_key": artifact.artifact_key,
+                    "artifact_type": "table",
+                },
             )
             artifacts_by_key[artifact.artifact_key] = row.id
         return artifacts_by_key
@@ -382,6 +386,7 @@ class IngestService:
                 caption=artifact.caption,
                 nearby_text=artifact.nearby_text,
                 metadata_json={
+                    **artifact.metadata_json,
                     "artifact_key": artifact.artifact_key,
                     "artifact_type": "image",
                     "asset_copied": asset_path is not None,
