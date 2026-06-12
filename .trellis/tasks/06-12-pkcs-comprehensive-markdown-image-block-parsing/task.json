@@ -61,6 +61,7 @@
   "meta": {
     "recommended_approach": "Enhance ParsedMarkdownBlockGraph classification and binding so linked, blockquote, reference, and HTML image syntax become image blocks with deterministic caption/nearby-text grouping.",
     "scope_decision": "Implement image recognition enhancement only; do not introduce a full MarkdownBlock AST in this task.",
+    "implementation_direction": "Confirmed: implement on top of the existing transient block graph enhancement plan and continue this strategy if acceptance succeeds.",
     "decision_date": "2026-06-12"
   }
 }

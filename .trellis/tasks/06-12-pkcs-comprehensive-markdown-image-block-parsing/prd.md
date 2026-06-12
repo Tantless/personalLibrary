@@ -250,6 +250,12 @@ User selected option 1 on 2026-06-12:
 * Do not introduce a full public/internal `MarkdownBlock` AST in this task.
 * Keep table parsing and the rest of the chunking architecture scoped to the current implementation unless a small adapter is required for image blocks.
 
+User confirmed implementation direction on 2026-06-12:
+
+* Use the existing block graph enhancement plan as the implementation plan.
+* Treat this approach as sufficient for most Markdown files when acceptance passes.
+* Continue using this block-graph-first strategy for later Markdown block correctness improvements if validation succeeds.
+
 ## Decision (ADR-lite)
 
 **Context**: Real Markdown documents commonly use linked images, blockquote images, reference images, and HTML `<img>` tags. The current parser now has a transient Markdown block graph, but only whole-line plain Markdown image syntax is classified as `block_type=image`; linked and HTML images are diagnostics-only.
