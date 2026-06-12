@@ -1,0 +1,7 @@
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": "src/pkcs/ingest/parsers.py", "reason": "Most likely source of table/image detection and locator bugs"}
+{"file": "src/pkcs/ingest/service.py", "reason": "Most likely source of artifact ID and asset copy bugs"}
+{"file": "src/pkcs/db/repositories.py", "reason": "Repository persistence and lookup path for artifact rows"}
+{"file": "src/pkcs/context_pack/service.py", "reason": "Hydration path when evidence misses artifact details"}
+{"file": "tests/test_ingest.py", "reason": "Primary regression test for ingest artifact links"}
+{"file": "tests/test_context_pack.py", "reason": "Primary regression test for artifact hydration"}

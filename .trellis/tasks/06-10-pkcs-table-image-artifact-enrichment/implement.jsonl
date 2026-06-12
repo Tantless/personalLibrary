@@ -1,0 +1,17 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/tasks/06-10-pkcs-table-image-artifact-enrichment/prd.md", "reason": "Accepted PRD, scope, ADR, and out-of-scope boundaries"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Backend layer ownership for parser, service, repository, storage, and Context Pack changes"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Database artifact schema, repository, metadata, and Context Pack contracts"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Backend verification requirements for parser/database/retrieval work"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Feature spans parse, store, retrieve, and render layers"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Search existing parser/repository/storage patterns before edits"}
+{"file": "src/pkcs/ingest/models.py", "reason": "ParsedSource, ParsedChunk, table artifact, and image artifact contracts"}
+{"file": "src/pkcs/ingest/parsers.py", "reason": "Markdown artifact-aware parsing and derived chunk construction"}
+{"file": "src/pkcs/ingest/service.py", "reason": "Ingest transaction flow, artifact persistence, asset archive copy, and metadata ID resolution"}
+{"file": "src/pkcs/db/models.py", "reason": "ORM models for sources, chunks, table_artifacts, and image_artifacts"}
+{"file": "src/pkcs/db/repositories.py", "reason": "Repository write/read methods for chunks, citations, and artifacts"}
+{"file": "src/pkcs/storage/raw_archive.py", "reason": "Raw Archive source and image asset write layout"}
+{"file": "src/pkcs/search/providers.py", "reason": "FTS returns artifact chunk metadata through search results"}
+{"file": "src/pkcs/context_pack/service.py", "reason": "Context Pack artifact hydration from chunk metadata"}
+{"file": "migrations/versions/20260610_0008_add_markdown_artifacts.py", "reason": "Alembic schema for Markdown table and image artifact tables"}

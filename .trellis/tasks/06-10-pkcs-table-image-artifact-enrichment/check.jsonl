@@ -1,0 +1,10 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Schema, comment, FK, repository, search, and Context Pack checks"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Required backend verification commands"}
+{"file": "tests/test_database_schema.py", "reason": "Schema, index, FK comment, and generated search_vector assertions"}
+{"file": "tests/test_repositories.py", "reason": "Artifact repository round trip coverage"}
+{"file": "tests/test_ingest.py", "reason": "Markdown artifact ingest, metadata links, asset archive, CLI and MCP ingest tests"}
+{"file": "tests/test_search.py", "reason": "Artifact-derived chunk search coverage"}
+{"file": "tests/test_context_pack.py", "reason": "Linked artifact hydration and Context Pack behavior"}
+{"file": "tests/test_raw_archive.py", "reason": "Raw Archive path behavior"}

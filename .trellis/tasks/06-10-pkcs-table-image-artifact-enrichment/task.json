@@ -4,7 +4,7 @@
   "title": "brainstorm: PKCS table image artifact enrichment",
   "description": "",
   "status": "planning",
-  "dev_type": null,
+  "dev_type": "backend",
   "scope": null,
   "package": null,
   "priority": "P2",
