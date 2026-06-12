@@ -372,15 +372,15 @@ The two can share parser substrate later, but they are not the same task.
 
 ## Acceptance Criteria (Evolving)
 
-* [ ] A Markdown fixture can be parsed into explicit `MarkdownDocumentGraph` blocks with deterministic block IDs and line locators.
-* [ ] Existing table/image artifact fixture still creates table/image artifacts and derived chunks.
-* [ ] Narrative chunk metadata contains `primary_block_ids` and `overlap_block_ids`.
-* [ ] When overlap includes an artifact placeholder, metadata marks it as `context_reference` instead of another primary link.
-* [ ] Artifact-derived chunks include `source_block_id` and `bound_block_ids`.
-* [ ] `trace-ingest` includes a `block_graph` stage showing block counts, block types, locators, edges, and artifact bindings.
-* [ ] No database migration is added for block persistence.
-* [ ] Current Linear Regression fixture shows why the linked YouTube image is or is not detected, with block-level diagnostics.
-* [ ] Existing ingest/search/context-pack tests pass.
+* [x] A Markdown fixture can be parsed into explicit `MarkdownDocumentGraph` blocks with deterministic block IDs and line locators.
+* [x] Existing table/image artifact fixture still creates table/image artifacts and derived chunks.
+* [x] Narrative chunk metadata contains `primary_block_ids` and `overlap_block_ids`.
+* [x] When overlap includes an artifact placeholder, metadata marks it as `context_reference` instead of another primary link.
+* [x] Artifact-derived chunks include `source_block_id` and `bound_block_ids`.
+* [x] `trace-ingest` includes a `block_graph` stage showing block counts, block types, locators, edges, and artifact bindings.
+* [x] No database migration is added for block persistence.
+* [x] Current Linear Regression fixture shows why the linked YouTube image is or is not detected, with block-level diagnostics.
+* [x] Existing ingest/search/context-pack tests pass.
 
 ## Definition Of Done
 

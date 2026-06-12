@@ -3,7 +3,7 @@
   "name": "pkcs-explicit-markdown-block-graph",
   "title": "brainstorm: PKCS explicit Markdown block graph",
   "description": "Design an explicit MarkdownBlock/block graph parsing pipeline to replace the current implicit rendered-entry artifact flow.",
-  "status": "planning",
+  "status": "completed",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "tantless",
   "assignee": "tantless",
   "createdAt": "2026-06-12",
-  "completedAt": null,
+  "completedAt": "2026-06-12",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 6,
   "next_action": [
     {
       "phase": 1,
@@ -42,12 +42,42 @@
       "action": "record-session"
     }
   ],
-  "commit": null,
+  "commit": "7e209c1",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
-  "relatedFiles": [],
-  "notes": "Scope confirmed: implement a transient internal MarkdownBlock graph only for parser/chunk planning and trace-ingest debug visibility. Do not add source_blocks persistence or block-level query/read responsibilities.",
-  "meta": {}
+  "relatedFiles": [
+    ".trellis/tasks/06-12-pkcs-explicit-markdown-block-graph/prd.md",
+    ".trellis/tasks/06-12-pkcs-explicit-markdown-block-graph/acceptance-report.md",
+    "src/pkcs/ingest/models.py",
+    "src/pkcs/ingest/parsers.py",
+    "src/pkcs/ingest/service.py",
+    "src/pkcs/ingest/trace.py",
+    "tests/test_ingest_trace.py",
+    "README.md",
+    ".trellis/spec/backend/directory-structure.md",
+    ".trellis/spec/backend/database-guidelines.md"
+  ],
+  "notes": "Implemented transient internal MarkdownBlock graph for parser/chunk planning and trace-ingest debug visibility. No source_blocks persistence or block-level query/read responsibilities were added.",
+  "meta": {
+    "verification": [
+      "docker compose ps postgres",
+      "uv run alembic upgrade head",
+      "uv run pytest tests/test_ingest_trace.py",
+      "uv run pytest tests/test_ingest.py tests/test_context_pack.py tests/test_search.py",
+      "uv run pytest",
+      "python .trellis/scripts/task.py validate .trellis/tasks/06-12-pkcs-explicit-markdown-block-graph",
+      "git diff --check"
+    ],
+    "test_result": "44 passed, 1 warning",
+    "sample_trace_output": "data/private/acceptance-inputs/2026-06-12-artifact-docs/linear-trace-debug.json",
+    "out_of_scope": [
+      "Persisted source_blocks table.",
+      "Block-level query/read API.",
+      "Linked image and HTML image artifact parsing.",
+      "OCR or vision summary enrichment.",
+      "PDF/HTML/docx artifact extraction."
+    ]
+  }
 }
