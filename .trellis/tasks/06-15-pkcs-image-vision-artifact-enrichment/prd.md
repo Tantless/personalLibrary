@@ -20,7 +20,7 @@
 
 ## Open Questions
 
-* 无多模态能力、图片不可读、agent 生成旁车失败时，MVP 应如何降级和记录？
+* None.
 
 ## Requirements (evolving)
 
@@ -31,13 +31,14 @@
 * `prepare-ingest` / Docling 先生成标准 package；图片理解只处理 package 中已经规范化的本地图片资产。
 * block 生成 image 对象时消费图片理解旁车信息，之后继续复用现有 chunking、artifact linking、raw archive、search/context pack 链路。
 * `image-enrichment.json` v1 使用精简字段集：`asset_path`、`vision_summary`、`ocr_text`、`visual_type`、`key_elements`、`confidence`。
+* 视觉理解失败不阻断 ingest：失败图片仍创建 image artifact，并保留 alt/caption/nearby 等确定性信息。
 
 ## Acceptance Criteria (evolving)
 
 * [x] 现状已核清：当前 image block 做了什么、缺什么、已有预留点是什么。
 * [x] 方案明确：pre-ingest 阶段如何生成视觉理解旁车数据，MCP ingest 如何消费。
 * [x] MVP 字段明确：image 对象至少包含哪些视觉语义字段。
-* [ ] 失败策略明确：无多模态能力、图片不可读、格式不支持时如何降级和记录。
+* [x] 失败策略明确：无多模态能力、图片不可读、格式不支持时如何降级和记录。
 
 ## Definition of Done (team quality bar)
 
@@ -116,6 +117,16 @@ MVP schema:
 * `key_elements`: 关键对象、标签、坐标轴、UI 元素、实体名等。
 * `confidence`: 枚举为 `high`、`medium`、`low`，用于记录 agent 对视觉理解可靠性的自评。
 
+### Failure Handling
+
+MVP 降级策略：
+
+* 单张图片理解成功：写入 `vision_summary` / `ocr_text`，并把 `visual_type`、`key_elements`、`confidence` 写入 image artifact metadata。
+* 单张图片理解失败：image artifact 仍正常创建；保留 `original_uri`、`asset_path`、`alt_text`、`caption`、`nearby_text`；metadata 记录 failure code / message。
+* 整个 agent vision 阶段不可用：`image-enrichment.json` 可不存在；MCP ingest 继续完成普通图片 artifact 摄入，trace 中保持 `vision_summary_present=false`。
+* `image-enrichment.json` 存在但 schema 无效：MVP 建议视为 enrichment 不可用，不阻断 ingest；记录 warning，避免用户资料因旁车文件错误无法入库。
+* 远程图片：默认不做视觉理解；继续保留 URI、alt/caption/nearby metadata。
+
 ## Decision (ADR-lite)
 
 **Context**: PKCS 已能识别 Markdown 图片 block 并持久化 image artifact，但视觉语义字段没有生成来源。用户希望复用 agent CLI 的多模态能力，而不是让普通用户额外接入视觉模型 API 或部署本地服务。
@@ -175,3 +186,24 @@ Relevant current tool capabilities:
 * This aligns with MCP image content support, but makes ingest a multi-turn model/client protocol and weakens deterministic ingest behavior.
 
 Recommended MVP direction: Approach A first, with a sidecar schema stable enough that different agent CLIs can produce it.
+
+## Implementation Plan
+
+PR1: Sidecar schema and ingest consumption
+
+* Add `ImageEnrichment` parser/validator for `image-enrichment.json`.
+* Extend `ParsedImageArtifact` with optional `ocr_text` and `vision_summary`.
+* Match enrichment by normalized `asset_path` / `original_uri`.
+* Persist `ocr_text`, `vision_summary`, `visual_type`, `key_elements`, `confidence`, and failure metadata.
+
+PR2: Parser summary and trace visibility
+
+* Include `vision_summary` and `ocr_text` in image summary chunk content when present.
+* Extend trace output to show enrichment matched / missing / failed.
+* Add tests for matched enrichment, missing sidecar, invalid sidecar, and per-image failure.
+
+PR3: Skill and docs after verified implementation
+
+* Update `pkcs-ingest` skill to instruct the agent to generate `image-enrichment.json` after `prepare-ingest`.
+* Update README only after code and tests confirm the end-to-end chain.
+* Add an acceptance example using a prepared package with local images.
