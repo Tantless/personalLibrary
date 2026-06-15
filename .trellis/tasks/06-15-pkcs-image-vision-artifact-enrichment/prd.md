@@ -20,7 +20,7 @@
 
 ## Open Questions
 
-* MVP 中视觉理解结果应覆盖哪些字段，才能既实用又不让 ingest 链路过重？
+* 无多模态能力、图片不可读、agent 生成旁车失败时，MVP 应如何降级和记录？
 
 ## Requirements (evolving)
 
@@ -30,12 +30,13 @@
 * 用户入口保持为 `pkcs-ingest` skill：skill 编排 pre-ingest、图片理解、MCP ingest，而不是让用户手动拼接步骤。
 * `prepare-ingest` / Docling 先生成标准 package；图片理解只处理 package 中已经规范化的本地图片资产。
 * block 生成 image 对象时消费图片理解旁车信息，之后继续复用现有 chunking、artifact linking、raw archive、search/context pack 链路。
+* `image-enrichment.json` v1 使用精简字段集：`asset_path`、`vision_summary`、`ocr_text`、`visual_type`、`key_elements`、`confidence`。
 
 ## Acceptance Criteria (evolving)
 
 * [x] 现状已核清：当前 image block 做了什么、缺什么、已有预留点是什么。
 * [x] 方案明确：pre-ingest 阶段如何生成视觉理解旁车数据，MCP ingest 如何消费。
-* [ ] MVP 字段明确：image 对象至少包含哪些视觉语义字段。
+* [x] MVP 字段明确：image 对象至少包含哪些视觉语义字段。
 * [ ] 失败策略明确：无多模态能力、图片不可读、格式不支持时如何降级和记录。
 
 ## Definition of Done (team quality bar)
@@ -85,6 +86,35 @@ data/private/ingest-prep/YYYY-MM-DD-source-slug/
 ```
 
 `image-enrichment.json` 由 agent 生成，PKCS 只校验和消费。MVP 先以 normalized asset path 作为主匹配键，例如 `assets/diagram.png`；远程图片默认不做视觉理解，只保留已有 URI、alt/caption/nearby metadata。
+
+### Image Enrichment Sidecar v1
+
+MVP schema:
+
+```json
+{
+  "schema_version": 1,
+  "images": [
+    {
+      "asset_path": "assets/diagram.png",
+      "vision_summary": "A system architecture diagram showing retrieval, ranking, and context assembly.",
+      "ocr_text": "Retriever -> Reranker -> Context Pack",
+      "visual_type": "diagram",
+      "key_elements": ["Retriever", "Reranker", "Context Pack"],
+      "confidence": "high"
+    }
+  ]
+}
+```
+
+字段约束：
+
+* `asset_path`: 必填，使用 package 内 normalized path，例如 `assets/diagram.png`。MVP 主匹配键。
+* `vision_summary`: 必填，面向检索和上下文生成的自然语言摘要。
+* `ocr_text`: 可为空字符串；有可读文字时提取图片内文字。
+* `visual_type`: 枚举建议为 `diagram`、`chart`、`screenshot`、`photo`、`other`。
+* `key_elements`: 关键对象、标签、坐标轴、UI 元素、实体名等。
+* `confidence`: 枚举为 `high`、`medium`、`low`，用于记录 agent 对视觉理解可靠性的自评。
 
 ## Decision (ADR-lite)
 
