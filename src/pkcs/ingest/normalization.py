@@ -1,10 +1,11 @@
 import json
 import re
 import shutil
+import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 
 MARKDOWN_EXTENSIONS = {".md", ".markdown", ".mdx"}
@@ -21,6 +22,11 @@ _TABLE_SEPARATOR_RE = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?
 
 class PrepareIngestError(ValueError):
     pass
+
+
+class DoclingRunner(Protocol):
+    def __call__(self, *, input_path: Path, output_dir: Path, timeout_seconds: int) -> tuple[Path, str | None]:
+        pass
 
 
 @dataclass(frozen=True)
@@ -98,6 +104,9 @@ class _NormalizationState:
 
 
 class PrepareIngestService:
+    def __init__(self, *, docling_runner: DoclingRunner | None = None) -> None:
+        self._docling_runner = docling_runner or self._run_docling_cli
+
     def prepare_source(
         self,
         *,
@@ -129,6 +138,7 @@ class PrepareIngestService:
         counts = PrepareIngestCounts()
         source_format = input_path.suffix.lower().lstrip(".")
         converter = "markdown-copy" if input_path.suffix.lower() in MARKDOWN_EXTENSIONS else "docling-cli"
+        converter_version: str | None = None
 
         try:
             self._inspect_input(input_path)
@@ -150,7 +160,31 @@ class PrepareIngestService:
                 steps.append(PrepareIngestStep(name="normalize_assets", status="success"))
                 steps.append(PrepareIngestStep(name="normalize_tables", status="success"))
             elif input_path.suffix.lower() in DOCUMENT_EXTENSIONS_REQUIRING_DOCLING:
-                raise PrepareIngestError("Docling conversion is not implemented in this PR-sized step")
+                docling_output_dir = prep_dir / "_docling"
+                converted_markdown_path, converter_version = self._docling_runner(
+                    input_path=input_path,
+                    output_dir=docling_output_dir,
+                    timeout_seconds=timeout_seconds,
+                )
+                normalized_markdown, state = self._normalize_markdown(
+                    input_path=converted_markdown_path,
+                    assets_dir=assets_dir,
+                )
+                document_path.write_text(normalized_markdown, encoding="utf-8")
+                counts = PrepareIngestCounts(
+                    local_images=state.local_images,
+                    remote_images=state.remote_images,
+                    missing_local_images=state.missing_local_images,
+                    inline_tables=_count_markdown_tables(normalized_markdown),
+                    sidecar_tables=0,
+                )
+                warnings.extend(state.warnings)
+                asset_mappings = state.asset_mappings
+                steps.append(PrepareIngestStep(name="convert", status="success", message="docling-cli"))
+                steps.append(PrepareIngestStep(name="normalize_assets", status="success"))
+                steps.append(PrepareIngestStep(name="normalize_tables", status="success"))
+                if docling_output_dir.exists():
+                    shutil.rmtree(docling_output_dir)
             else:
                 raise PrepareIngestError(f"unsupported prepare-ingest source format: {input_path.suffix.lower()}")
 
@@ -175,6 +209,7 @@ class PrepareIngestService:
                 input_path=input_path,
                 source_format=source_format,
                 converter=converter,
+                converter_version=converter_version,
                 timeout_seconds=timeout_seconds,
             )
             self._write_ingest_log(
@@ -202,6 +237,7 @@ class PrepareIngestService:
             input_path=input_path,
             source_format=source_format,
             converter=converter,
+            converter_version=converter_version,
             timeout_seconds=timeout_seconds,
         )
         self._write_ingest_log(
@@ -331,6 +367,67 @@ class PrepareIngestService:
         if not document_path.read_text(encoding="utf-8-sig").strip():
             raise PrepareIngestError("document.md is empty")
 
+    def _run_docling_cli(
+        self,
+        *,
+        input_path: Path,
+        output_dir: Path,
+        timeout_seconds: int,
+    ) -> tuple[Path, str | None]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        command = [
+            "docling",
+            "--to",
+            "md",
+            "--image-export-mode",
+            "referenced",
+            "--output",
+            str(output_dir),
+        ]
+        if input_path.suffix.lower() in {".html", ".htm"}:
+            command.extend(["--html-image-fetch", "local"])
+        command.append(str(input_path))
+
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise PrepareIngestError(
+                "Docling CLI is not installed or not on PATH; install Docling and retry prepare-ingest"
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise PrepareIngestError(f"Docling conversion timed out after {timeout_seconds} seconds") from exc
+
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "no output").strip().splitlines()
+            short_detail = detail[-1] if detail else "no output"
+            raise PrepareIngestError(f"Docling conversion failed: {short_detail[:500]}")
+
+        markdown_outputs = sorted(output_dir.rglob("*.md"))
+        if not markdown_outputs:
+            raise PrepareIngestError("Docling conversion did not produce a Markdown file")
+        return markdown_outputs[0], self._docling_version()
+
+    def _docling_version(self) -> str | None:
+        try:
+            completed = subprocess.run(
+                ["docling", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return None
+        if completed.returncode != 0:
+            return None
+        return (completed.stdout or completed.stderr).strip() or None
+
     def _prepare_directory(
         self,
         *,
@@ -357,6 +454,7 @@ class PrepareIngestService:
         input_path: Path,
         source_format: str,
         converter: str,
+        converter_version: str | None,
         timeout_seconds: int,
     ) -> None:
         payload = {
@@ -366,7 +464,7 @@ class PrepareIngestService:
             "source_format": source_format,
             "normalized_format": "md",
             "converter": converter,
-            "converter_version": None,
+            "converter_version": converter_version,
             "prepared_at": datetime.now().astimezone().isoformat(timespec="seconds"),
             "timeout_seconds": timeout_seconds,
         }

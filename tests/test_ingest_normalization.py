@@ -122,9 +122,50 @@ def test_prepare_ingest_cli_outputs_json_report(tmp_path) -> None:
     assert Path(body["ingest_log_path"]).exists()
 
 
-def test_prepare_ingest_non_markdown_reports_hard_fail_until_docling_adapter_exists(tmp_path) -> None:
+def test_prepare_ingest_docling_runner_normalizes_converted_markdown(tmp_path) -> None:
+    def fake_docling_runner(*, input_path: Path, output_dir: Path, timeout_seconds: int) -> tuple[Path, str]:
+        artifact_dir = output_dir / "source_artifacts"
+        artifact_dir.mkdir(parents=True)
+        (artifact_dir / "figure.png").write_bytes(b"figure")
+        output_path = output_dir / f"{input_path.stem}.md"
+        output_path.write_text(
+            "# Converted\n\n"
+            "![Figure](source_artifacts/figure.png)\n\n"
+            "| A | B |\n"
+            "| --- | --- |\n"
+            "| X | Y |\n",
+            encoding="utf-8",
+        )
+        return output_path, "docling fake"
+
     source_path = tmp_path / "source.pdf"
     source_path.write_bytes(b"%PDF fake")
+
+    report = PrepareIngestService(docling_runner=fake_docling_runner).prepare_source(
+        path=source_path,
+        output_root=tmp_path / "prep",
+        slug="pdf-case",
+    )
+
+    body = report.to_dict()
+    prep_dir = Path(body["prep_dir"])
+    document = Path(body["document_path"]).read_text(encoding="utf-8")
+    source_info = json.loads(Path(body["source_info_path"]).read_text(encoding="utf-8"))
+
+    assert body["status"] == "success"
+    assert body["counts"]["local_images"] == 1
+    assert body["counts"]["inline_tables"] == 1
+    assert "![Figure](assets/figure.png)" in document
+    assert (prep_dir / "assets" / "figure.png").read_bytes() == b"figure"
+    assert not (prep_dir / "_docling").exists()
+    assert source_info["converter"] == "docling-cli"
+    assert source_info["converter_version"] == "docling fake"
+
+
+def test_prepare_ingest_docling_missing_reports_hard_fail(monkeypatch, tmp_path) -> None:
+    source_path = tmp_path / "source.pdf"
+    source_path.write_bytes(b"%PDF fake")
+    monkeypatch.setenv("PATH", "")
 
     result = CliRunner().invoke(
         cli_app,
@@ -143,6 +184,7 @@ def test_prepare_ingest_non_markdown_reports_hard_fail_until_docling_adapter_exi
     assert body["status"] == "hard_fail"
     assert body["document_path"] is None
     assert body["errors"][0]["code"] == "prepare_ingest_failed"
+    assert "Docling CLI is not installed" in body["errors"][0]["message"]
 
 
 def test_prepared_markdown_package_can_be_ingested(db_session, tmp_path) -> None:
