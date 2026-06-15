@@ -7,6 +7,7 @@ from pkcs.config import get_settings
 from pkcs.context_pack import ContextPackService
 from pkcs.health import get_health_status
 from pkcs.ingest import ArtifactIngestTraceService, IngestService
+from pkcs.ingest.normalization import PrepareIngestService
 from pkcs.reader import ReadSourceService
 from pkcs.search import SearchService
 
@@ -33,6 +34,31 @@ def ingest(
         canonical_key=canonical_key,
     )
     typer.echo(json.dumps(report.to_dict(), ensure_ascii=False))
+
+
+@app.command("prepare-ingest")
+def prepare_ingest(
+    path: Path = typer.Argument(..., help="Single local source file to normalize before MCP ingest."),
+    output_root: Path = typer.Option(
+        Path("data/private/ingest-prep"),
+        "--output-root",
+        help="Directory where the normalized ingest package is created.",
+    ),
+    slug: str | None = typer.Option(None, "--slug", help="Readable package directory suffix."),
+    timeout_seconds: int = typer.Option(300, "--timeout-seconds", min=1, help="Docling subprocess timeout."),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite the target package directory if it exists."),
+) -> None:
+    """Prepare a normalized Markdown package for MCP ingest."""
+    report = PrepareIngestService().prepare_source(
+        path=path,
+        output_root=output_root,
+        slug=slug,
+        timeout_seconds=timeout_seconds,
+        overwrite=overwrite,
+    )
+    typer.echo(json.dumps(report.to_dict(), ensure_ascii=False))
+    if report.status == "hard_fail":
+        raise typer.Exit(code=1)
 
 
 @app.command("trace-ingest")
