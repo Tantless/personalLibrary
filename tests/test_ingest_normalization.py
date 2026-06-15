@@ -1,4 +1,5 @@
 import json
+import subprocess
 from contextlib import nullcontext
 from pathlib import Path
 from uuid import uuid4
@@ -10,6 +11,7 @@ from pkcs.cli import app as cli_app
 from pkcs.config import get_settings
 from pkcs.db.models import ImageArtifact
 from pkcs.ingest import IngestService, PrepareIngestService
+from pkcs.ingest.normalization import _find_docling_executable
 from pkcs.mcp.server import create_mcp_server
 from pkcs.storage.raw_archive import RawArchiveWriter
 
@@ -164,6 +166,50 @@ def test_prepare_ingest_docling_runner_normalizes_converted_markdown(tmp_path) -
     assert source_info["converter_version"] == "docling fake"
 
 
+def test_prepare_ingest_docling_cli_uses_absolute_paths_and_pdf_fast_defaults(monkeypatch, tmp_path) -> None:
+    source_path = tmp_path / "source.pdf"
+    source_path.write_bytes(b"%PDF fake")
+    output_dir = tmp_path / "prep" / "_docling"
+    commands: list[list[str]] = []
+
+    def fake_run(command, *, capture_output, text, timeout, check):
+        commands.append(command)
+        if len(command) == 2 and command[1] == "--version":
+            return subprocess.CompletedProcess(command, 0, stdout="docling fake", stderr="")
+
+        command_output_dir = Path(command[command.index("--output") + 1])
+        command_output_dir.mkdir(parents=True, exist_ok=True)
+        (command_output_dir / "source.md").write_text("# Converted\n", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    converted_path, converter_version = PrepareIngestService()._run_docling_cli(
+        input_path=source_path,
+        output_dir=output_dir,
+        timeout_seconds=123,
+    )
+
+    docling_command = commands[0]
+    assert Path(docling_command[docling_command.index("--output") + 1]).is_absolute()
+    assert Path(docling_command[-1]).is_absolute()
+    assert "--no-ocr" in docling_command
+    assert docling_command[docling_command.index("--table-mode") + 1] == "fast"
+    assert converted_path == output_dir.resolve() / "source.md"
+    assert converter_version == "docling fake"
+
+
+def test_find_docling_executable_falls_back_to_uv_tool_bin(monkeypatch, tmp_path) -> None:
+    local_bin = tmp_path / ".local" / "bin"
+    local_bin.mkdir(parents=True)
+    docling = local_bin / "docling.exe"
+    docling.write_text("", encoding="utf-8")
+    monkeypatch.setattr("pkcs.ingest.normalization.shutil.which", lambda name: None)
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+    assert _find_docling_executable() == str(docling)
+
+
 def test_prepare_ingest_xlsx_large_table_uses_sidecar(tmp_path) -> None:
     def fake_docling_runner(*, input_path: Path, output_dir: Path, timeout_seconds: int) -> tuple[Path, str]:
         output_dir.mkdir(parents=True)
@@ -207,6 +253,7 @@ def test_prepare_ingest_docling_missing_reports_hard_fail(monkeypatch, tmp_path)
     source_path = tmp_path / "source.pdf"
     source_path.write_bytes(b"%PDF fake")
     monkeypatch.setenv("PATH", "")
+    monkeypatch.setattr("pkcs.ingest.normalization._find_docling_executable", lambda: "docling")
 
     result = CliRunner().invoke(
         cli_app,

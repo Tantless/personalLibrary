@@ -390,18 +390,23 @@ class PrepareIngestService:
         timeout_seconds: int,
     ) -> tuple[Path, str | None]:
         output_dir.mkdir(parents=True, exist_ok=True)
+        resolved_input_path = input_path.resolve()
+        resolved_output_dir = output_dir.resolve()
+        docling_executable = _find_docling_executable()
         command = [
-            "docling",
+            docling_executable,
             "--to",
             "md",
             "--image-export-mode",
             "referenced",
             "--output",
-            str(output_dir),
+            str(resolved_output_dir),
         ]
+        if input_path.suffix.lower() == ".pdf":
+            command.extend(["--no-ocr", "--table-mode", "fast"])
         if input_path.suffix.lower() in {".html", ".htm"}:
             command.extend(["--html-image-fetch", "local"])
-        command.append(str(input_path))
+        command.append(str(resolved_input_path))
 
         try:
             completed = subprocess.run(
@@ -431,7 +436,7 @@ class PrepareIngestService:
     def _docling_version(self) -> str | None:
         try:
             completed = subprocess.run(
-                ["docling", "--version"],
+                [_find_docling_executable(), "--version"],
                 capture_output=True,
                 text=True,
                 timeout=15,
@@ -528,6 +533,19 @@ def _strip_angle_destination(uri: str) -> str:
 
 def _is_remote_or_data_uri(value: str) -> bool:
     return "://" in value or value.startswith(("data:", "mailto:", "#"))
+
+
+def _find_docling_executable() -> str:
+    executable = shutil.which("docling")
+    if executable:
+        return executable
+
+    local_bin = Path.home() / ".local" / "bin"
+    for name in ("docling.exe", "docling.cmd", "docling"):
+        candidate = local_bin / name
+        if candidate.exists():
+            return str(candidate)
+    return "docling"
 
 
 def _looks_like_image_uri(value: str) -> bool:
