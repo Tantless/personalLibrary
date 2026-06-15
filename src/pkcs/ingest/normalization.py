@@ -11,6 +11,8 @@ from typing import Any, Protocol
 MARKDOWN_EXTENSIONS = {".md", ".markdown", ".mdx"}
 DOCUMENT_EXTENSIONS_REQUIRING_DOCLING = {".pdf", ".docx", ".xlsx", ".html", ".htm"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".tif", ".avif"}
+LARGE_TABLE_MAX_INLINE_ROWS = 20
+LARGE_TABLE_MAX_INLINE_CHARS = 4000
 
 _MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]*)\)")
 _REFERENCE_DEFINITION_RE = re.compile(r"^(\s{0,3}\[([^\]]+)\]:\s*)(\S+)(.*)$")
@@ -103,6 +105,14 @@ class _NormalizationState:
     missing_local_images: int = 0
 
 
+@dataclass(frozen=True)
+class _TableNormalizationResult:
+    markdown: str
+    inline_tables: int
+    sidecar_tables: int
+    table_mappings: list[dict[str, Any]]
+
+
 class PrepareIngestService:
     def __init__(self, *, docling_runner: DoclingRunner | None = None) -> None:
         self._docling_runner = docling_runner or self._run_docling_cli
@@ -136,6 +146,7 @@ class PrepareIngestService:
         warnings: list[PrepareIngestIssue] = []
         errors: list[PrepareIngestIssue] = []
         counts = PrepareIngestCounts()
+        table_mappings: list[dict[str, Any]] = []
         source_format = input_path.suffix.lower().lstrip(".")
         converter = "markdown-copy" if input_path.suffix.lower() in MARKDOWN_EXTENSIONS else "docling-cli"
         converter_version: str | None = None
@@ -146,13 +157,15 @@ class PrepareIngestService:
 
             if input_path.suffix.lower() in MARKDOWN_EXTENSIONS:
                 normalized_markdown, state = self._normalize_markdown(input_path=input_path, assets_dir=assets_dir)
-                document_path.write_text(normalized_markdown, encoding="utf-8")
+                table_result = _normalize_tables(markdown=normalized_markdown, tables_dir=tables_dir)
+                document_path.write_text(table_result.markdown, encoding="utf-8")
+                table_mappings = table_result.table_mappings
                 counts = PrepareIngestCounts(
                     local_images=state.local_images,
                     remote_images=state.remote_images,
                     missing_local_images=state.missing_local_images,
-                    inline_tables=_count_markdown_tables(normalized_markdown),
-                    sidecar_tables=0,
+                    inline_tables=table_result.inline_tables,
+                    sidecar_tables=table_result.sidecar_tables,
                 )
                 warnings.extend(state.warnings)
                 asset_mappings = state.asset_mappings
@@ -170,13 +183,15 @@ class PrepareIngestService:
                     input_path=converted_markdown_path,
                     assets_dir=assets_dir,
                 )
-                document_path.write_text(normalized_markdown, encoding="utf-8")
+                table_result = _normalize_tables(markdown=normalized_markdown, tables_dir=tables_dir)
+                document_path.write_text(table_result.markdown, encoding="utf-8")
+                table_mappings = table_result.table_mappings
                 counts = PrepareIngestCounts(
                     local_images=state.local_images,
                     remote_images=state.remote_images,
                     missing_local_images=state.missing_local_images,
-                    inline_tables=_count_markdown_tables(normalized_markdown),
-                    sidecar_tables=0,
+                    inline_tables=table_result.inline_tables,
+                    sidecar_tables=table_result.sidecar_tables,
                 )
                 warnings.extend(state.warnings)
                 asset_mappings = state.asset_mappings
@@ -217,7 +232,7 @@ class PrepareIngestService:
                 status=status,
                 steps=steps,
                 asset_mappings=asset_mappings,
-                table_mappings=[],
+                table_mappings=table_mappings,
                 warnings=warnings,
                 errors=errors,
             )
@@ -245,7 +260,7 @@ class PrepareIngestService:
             status=status,
             steps=steps,
             asset_mappings=asset_mappings,
-            table_mappings=[],
+            table_mappings=table_mappings,
             warnings=warnings,
             errors=errors,
         )
@@ -540,15 +555,57 @@ def _normalize_reference_label(value: str) -> str:
     return " ".join(value.strip().lower().split())
 
 
-def _count_markdown_tables(markdown: str) -> int:
+def _normalize_tables(*, markdown: str, tables_dir: Path) -> _TableNormalizationResult:
     lines = markdown.splitlines()
-    count = 0
-    for index in range(1, len(lines)):
-        if "|" not in lines[index - 1] or "|" not in lines[index]:
+    output_lines: list[str] = []
+    table_mappings: list[dict[str, Any]] = []
+    inline_tables = 0
+    sidecar_tables = 0
+    table_index = 1
+    index = 0
+    while index < len(lines):
+        if index + 1 >= len(lines) or "|" not in lines[index] or not _TABLE_SEPARATOR_RE.match(lines[index + 1]):
+            output_lines.append(lines[index])
+            index += 1
             continue
-        if _TABLE_SEPARATOR_RE.match(lines[index]):
-            count += 1
-    return count
+
+        table_start = index
+        table_end = index + 2
+        while table_end < len(lines) and lines[table_end].strip() and "|" in lines[table_end]:
+            table_end += 1
+        table_lines = lines[table_start:table_end]
+        table_text = "\n".join(table_lines) + "\n"
+        data_rows = max(0, len(table_lines) - 2)
+
+        if data_rows > LARGE_TABLE_MAX_INLINE_ROWS or len(table_text) > LARGE_TABLE_MAX_INLINE_CHARS:
+            sidecar_tables += 1
+            table_filename = f"table-{sidecar_tables:03d}.md"
+            table_path = tables_dir / table_filename
+            table_path.write_text(table_text, encoding="utf-8")
+            normalized_path = f"tables/{table_filename}"
+            output_lines.append(f"Table: `{normalized_path}`")
+            table_mappings.append(
+                {
+                    "original": f"table-{table_index:03d}",
+                    "normalized": normalized_path,
+                    "rows": data_rows,
+                }
+            )
+        else:
+            inline_tables += 1
+            output_lines.extend(table_lines)
+        table_index += 1
+        index = table_end
+
+    normalized_markdown = "\n".join(output_lines)
+    if markdown.endswith("\n"):
+        normalized_markdown += "\n"
+    return _TableNormalizationResult(
+        markdown=normalized_markdown,
+        inline_tables=inline_tables,
+        sidecar_tables=sidecar_tables,
+        table_mappings=table_mappings,
+    )
 
 
 def _slugify(value: str) -> str:

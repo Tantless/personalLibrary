@@ -7,8 +7,10 @@ from sqlalchemy import select
 from typer.testing import CliRunner
 
 from pkcs.cli import app as cli_app
+from pkcs.config import get_settings
 from pkcs.db.models import ImageArtifact
 from pkcs.ingest import IngestService, PrepareIngestService
+from pkcs.mcp.server import create_mcp_server
 from pkcs.storage.raw_archive import RawArchiveWriter
 
 
@@ -162,6 +164,45 @@ def test_prepare_ingest_docling_runner_normalizes_converted_markdown(tmp_path) -
     assert source_info["converter_version"] == "docling fake"
 
 
+def test_prepare_ingest_xlsx_large_table_uses_sidecar(tmp_path) -> None:
+    def fake_docling_runner(*, input_path: Path, output_dir: Path, timeout_seconds: int) -> tuple[Path, str]:
+        output_dir.mkdir(parents=True)
+        output_path = output_dir / f"{input_path.stem}.md"
+        rows = "\n".join(f"| Row {index} | Value {index} |" for index in range(1, 23))
+        output_path.write_text(
+            "# Workbook\n\n"
+            "| Name | Value |\n"
+            "| --- | --- |\n"
+            f"{rows}\n",
+            encoding="utf-8",
+        )
+        return output_path, "docling fake"
+
+    source_path = tmp_path / "workbook.xlsx"
+    source_path.write_bytes(b"fake-xlsx")
+
+    report = PrepareIngestService(docling_runner=fake_docling_runner).prepare_source(
+        path=source_path,
+        output_root=tmp_path / "prep",
+        slug="xlsx-case",
+    )
+
+    body = report.to_dict()
+    prep_dir = Path(body["prep_dir"])
+    document = Path(body["document_path"]).read_text(encoding="utf-8")
+    sidecar = prep_dir / "tables" / "table-001.md"
+    ingest_log = json.loads(Path(body["ingest_log_path"]).read_text(encoding="utf-8"))
+
+    assert body["status"] == "success"
+    assert body["counts"]["inline_tables"] == 0
+    assert body["counts"]["sidecar_tables"] == 1
+    assert "Table: `tables/table-001.md`" in document
+    assert "| Row 22 | Value 22 |" in sidecar.read_text(encoding="utf-8")
+    assert ingest_log["table_mappings"] == [
+        {"original": "table-001", "normalized": "tables/table-001.md", "rows": 22}
+    ]
+
+
 def test_prepare_ingest_docling_missing_reports_hard_fail(monkeypatch, tmp_path) -> None:
     source_path = tmp_path / "source.pdf"
     source_path.write_bytes(b"%PDF fake")
@@ -217,3 +258,38 @@ def test_prepared_markdown_package_can_be_ingested(db_session, tmp_path) -> None
     assert image.original_uri == "assets/diagram.png"
     assert image.asset_path is not None
     assert Path(image.asset_path).read_bytes() == b"diagram"
+
+
+async def test_prepared_markdown_package_can_be_ingested_through_mcp(
+    monkeypatch,
+    migrated_database_url,
+    tmp_path,
+) -> None:
+    source_path = tmp_path / "mcp-package.md"
+    source_path.write_text("# MCP Package\n\nPrepared Markdown reaches MCP ingest.\n", encoding="utf-8")
+    prepare_report = PrepareIngestService().prepare_source(
+        path=source_path,
+        output_root=tmp_path / "prep",
+        slug="mcp-case",
+    )
+    monkeypatch.setenv("PKCS_DATABASE_URL", migrated_database_url)
+    monkeypatch.setenv("PKCS_RAW_ARCHIVE_PATH", str(tmp_path / "raw"))
+    get_settings.cache_clear()
+
+    try:
+        server = create_mcp_server()
+        result = await server.call_tool(
+            "ingest_source",
+            {
+                "path": prepare_report.document_path,
+                "knowledge_type": "document",
+                "canonical_key": f"document:prepared-mcp-{uuid4().hex}",
+            },
+        )
+    finally:
+        get_settings.cache_clear()
+
+    body = json.loads(result[0].text)
+    assert prepare_report.status == "success"
+    assert body["status"] == "completed"
+    assert body["succeeded"][0]["chunks_created"] >= 1
