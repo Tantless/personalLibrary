@@ -287,17 +287,17 @@ User confirmed implementation direction on 2026-06-12:
 
 ## Acceptance Criteria (Evolving)
 
-* [ ] A synthetic fixture with standalone, blockquote, linked, reference, and HTML images creates one `image_artifact` per visible image.
-* [ ] The user example creates one `image_artifact` whose `original_uri` is the YouTube thumbnail URL and whose metadata contains the outer YouTube link.
-* [ ] The user example image block includes the first explanatory blockquote as `caption` and preserves broader adjacent note as `nearby_text`.
-* [ ] In the user Linear Regression README trace, the linked YouTube thumbnail line is `block_type=image`, no longer an `unsupported_linked_markdown_image` diagnostic.
-* [ ] HTML `<img alt="Average price" src="images/chart.png" width="50%">` creates an image artifact with `alt_text`, `original_uri`, and dimensions in metadata.
-* [ ] HTML image blocks are no longer emitted only as generic `html` blocks with `unsupported_html_image` diagnostics.
-* [ ] Local assets from blockquote/HTML images are copied to Raw Archive when the file exists.
-* [ ] Remote image URLs do not attempt local asset copying and keep `asset_path=None`.
-* [ ] Images inside fenced code blocks are ignored.
-* [ ] Existing table/image artifact tests still pass.
-* [ ] `trace-ingest` reports richer image syntax counts plus source/bound block ids for attached caption/nearby text.
+* [x] A synthetic fixture with standalone, blockquote, linked, reference, and HTML images creates one `image_artifact` per visible image.
+* [x] The user example creates one `image_artifact` whose `original_uri` is the YouTube thumbnail URL and whose metadata contains the outer YouTube link.
+* [x] The user example image block includes the first explanatory blockquote as `caption` and preserves broader adjacent note as `nearby_text`.
+* [x] In the user Linear Regression README trace, the linked YouTube thumbnail line is `block_type=image`, no longer an `unsupported_linked_markdown_image` diagnostic.
+* [x] HTML `<img alt="Average price" src="images/chart.png" width="50%">` creates an image artifact with `alt_text`, `original_uri`, and dimensions in metadata.
+* [x] HTML image blocks are no longer emitted only as generic `html` blocks with `unsupported_html_image` diagnostics.
+* [x] Local assets from blockquote/HTML images are copied to Raw Archive when the file exists.
+* [x] Remote image URLs do not attempt local asset copying and keep `asset_path=None`.
+* [x] Images inside fenced code blocks are ignored.
+* [x] Existing table/image artifact tests still pass.
+* [x] `trace-ingest` reports richer image syntax counts plus source/bound block ids for attached caption/nearby text.
 
 ## Definition of Done
 

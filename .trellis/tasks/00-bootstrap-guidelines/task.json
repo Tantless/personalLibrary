@@ -13,7 +13,7 @@
   "subtasks": [
     {
       "name": "Fill backend guidelines",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "name": "Fill frontend guidelines",
@@ -21,7 +21,7 @@
     },
     {
       "name": "Add code examples",
-      "status": "pending"
+      "status": "in_progress"
     }
   ],
   "children": [],
@@ -30,6 +30,8 @@
     ".trellis/spec/backend/",
     ".trellis/spec/frontend/"
   ],
-  "notes": "First-time setup task created by trellis init (fullstack project)",
-  "meta": {}
+  "notes": "Backend guidelines are filled with project-specific PKCS contracts and examples. Frontend guideline files remain template placeholders because the current repository has no frontend implementation yet.",
+  "meta": {
+    "state_sync": "2026-06-15: kept task in_progress; backend spec is active, frontend spec still needs a future decision or actual frontend conventions."
+  }
 }

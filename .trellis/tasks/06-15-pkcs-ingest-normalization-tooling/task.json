@@ -3,7 +3,7 @@
   "name": "06-15-pkcs-ingest-normalization-tooling",
   "title": "brainstorm: PKCS ingest normalization tooling with Docling",
   "description": "Introduce prepare-ingest normalization tooling with external Docling CLI and validate prepare-ingest -> MCP ingest_source chain.",
-  "status": "review",
+  "status": "completed",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "tantless",
   "assignee": "tantless",
   "createdAt": "2026-06-15",
-  "completedAt": null,
+  "completedAt": "2026-06-15",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 4,
+  "current_phase": 6,
   "next_action": [
     {
       "phase": 1,
@@ -42,7 +42,7 @@
       "action": "record-session"
     }
   ],
-  "commit": "97b511e",
+  "commit": "7f8d006,d0f781e,97b511e,8d316d7",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -56,7 +56,7 @@
     "src/pkcs/ingest/normalization.py",
     "tests/test_ingest_normalization.py"
   ],
-  "notes": "Implemented prepare-ingest package generation and validated the prepare-ingest -> MCP ingest_source chain. Awaiting user acceptance.",
+  "notes": "Completed prepare-ingest package generation and validated the prepare-ingest -> MCP ingest_source chain. README and pkcs-ingest skill now document the verified workflow.",
   "meta": {
     "dependency_strategy": "Use external docling CLI first; evaluate optional docling-slim dependency after stable acceptance.",
     "verification": [
@@ -67,6 +67,7 @@
       "uv run pytest",
       "git diff --check"
     ],
-    "test_result": "54 passed, 1 warning"
+    "test_result": "54 passed, 1 warning",
+    "state_sync": "2026-06-15: status synchronized from review to completed after confirming implementation, acceptance report, and current full pytest result."
   }
 }
