@@ -8,7 +8,7 @@ PKCS 是一个本地优先的个人知识上下文服务，用来把本地文档
 * 使用 PostgreSQL full-text search 检索知识片段。
 * 通过 `read_source` 从 Raw Archive 读取可追溯原文证据。
 * 生成 Context Pack v0，包含 JSON 结构化数据和 Markdown 摘要。
-* 提供 Typer CLI、FastAPI health endpoint 和 FastMCP tools。
+* 提供 FastMCP tools，并保留本地 health endpoint 便于部署检查。
 * 可选使用 Docling CLI 将 PDF/DOCX/XLSX/HTML 预处理为 Markdown ingest package。
 
 ## 环境要求
@@ -41,37 +41,19 @@ postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs
 
 如果 `uv run pkcs health` 返回 `{"status": "ok", ...}`，说明本地环境已启动成功。
 
-## 常用命令
+## Agent / MCP 用法
 
-摄入 Markdown 或 text 文档：
+PKCS 的推荐使用方式是接入 Codex CLI、Claude Code 等 agent CLI，让 agent 通过 MCP tools 操作知识库。
 
-```bash
-uv run pkcs ingest tests/fixtures/markdown/product-notes.md --knowledge-type document
-```
+摄入资料时，不需要用户直接调用底层命令。把 PKCS MCP server 接入 agent CLI 后，让 agent 使用 `pkcs-ingest` skill 处理本地文件；该 skill 会完成预处理，并通过 MCP `ingest_source` 写入知识库。
 
-摄入 AI conversation：
+可暴露给 agent 的 MCP tools：
 
-```bash
-uv run pkcs ingest tests/fixtures/conversations/codex-session.jsonl --knowledge-type ai_conversation
-```
-
-搜索知识库：
-
-```bash
-uv run pkcs search "source evidence" --top-k 5
-```
-
-读取搜索结果对应的原文证据：
-
-```bash
-uv run pkcs read --chunk-id <chunk_id> --context-lines 2
-```
-
-生成 Context Pack：
-
-```bash
-uv run pkcs context-pack "source evidence" --top-k 10 --budget-tokens 800
-```
+* `health_check`: 检查 PKCS 服务状态。
+* `ingest_source`: 摄入本地文件或已预处理的 Markdown package。
+* `search_knowledge`: 检索已摄入知识。
+* `read_source`: 按 `chunk_id` 或 citation 读取原文证据。
+* `get_context_pack`: 为一个问题生成 Context Pack。
 
 ## 支持的输入
 
@@ -87,12 +69,7 @@ uv run pkcs context-pack "source evidence" --top-k 10 --budget-tokens 800
 * Markdown: `.md`, `.markdown`, `.mdx`
 * Docling-backed: `.pdf`, `.docx`, `.xlsx`, `.html`, `.htm`
 
-示例：
-
-```bash
-uv run pkcs prepare-ingest path/to/source.pdf --output-root data/private/ingest-prep --slug source
-uv run pkcs ingest data/private/ingest-prep/YYYY-MM-DD-source/document.md --knowledge-type document
-```
+对于 PDF、DOCX、XLSX、HTML 等非 Markdown 输入，由 agent 调用 `pkcs-ingest` skill 完成规范化，再通过 MCP `ingest_source` 摄入生成的 `document.md`。
 
 ## HTTP 服务
 
@@ -108,17 +85,9 @@ uv run uvicorn pkcs.http.app:app --host 127.0.0.1 --port 8765
 GET http://127.0.0.1:8765/health
 ```
 
-## MCP Tools
+## MCP Server
 
-`src/pkcs/mcp/server.py` 暴露 FastMCP server object `mcp`，包含以下 tools：
-
-* `health_check`
-* `ingest_source`
-* `search_knowledge`
-* `read_source`
-* `get_context_pack`
-
-请在你的 MCP client 中指向该 Python module，并确保启动前已完成 `uv sync`、PostgreSQL 启动和 Alembic migration。
+`src/pkcs/mcp/server.py` 暴露 FastMCP server object `mcp`。请在你的 MCP client 中指向该 Python module，并确保启动前已完成依赖安装、PostgreSQL 启动和 Alembic migration。
 
 ## 配置
 
