@@ -16,6 +16,7 @@ from pkcs.ingest.models import (
     ParsedSource,
     ParsedTableArtifact,
 )
+from pkcs.ingest.image_enrichment import ImageEnrichmentSidecar, load_image_enrichment_sidecar
 from pkcs.ingest.parsers import parse_source_file
 from pkcs.ingest.service import IngestService, SessionFactory
 from pkcs.source_metadata import (
@@ -72,6 +73,7 @@ class ArtifactIngestTraceService:
         source_format_code = source_format_code_for_path(resolved_path)
         normalized_format_code = normalized_format_code_for_source_format(source_format_code)
         knowledge_type_code = knowledge_type_code_for_name(knowledge_type)
+        image_enrichment = load_image_enrichment_sidecar(resolved_path)
 
         parsed = parse_source_file(
             path=resolved_path,
@@ -79,6 +81,7 @@ class ArtifactIngestTraceService:
             content_bytes=content_bytes,
             max_chars=self.chunk_max_chars,
             overlap_lines=self.chunk_overlap_lines,
+            image_enrichments=image_enrichment.entries_by_asset_path,
         )
         ingest = IngestService(
             session_factory=self.session_factory,
@@ -97,6 +100,7 @@ class ArtifactIngestTraceService:
             "design_delta": _design_delta(),
             "stage_order": [
                 "input",
+                "image_enrichment",
                 "block_graph",
                 "parser",
                 "asset_resolution",
@@ -111,6 +115,7 @@ class ArtifactIngestTraceService:
                 source_format_code=source_format_code,
                 normalized_format_code=normalized_format_code,
             ),
+            "image_enrichment": _image_enrichment_trace(image_enrichment),
             "block_graph": _block_graph_trace(parsed.markdown_block_graph),
             "parser": _parsed_source_trace(parsed),
             "asset_resolution": _asset_resolution_trace(source_path=resolved_path, parsed=parsed),
@@ -205,6 +210,10 @@ def _input_trace(
         "source_format": source_format_name(source_format_code),
         "normalized_format": normalized_format_name(normalized_format_code),
     }
+
+
+def _image_enrichment_trace(image_enrichment: ImageEnrichmentSidecar) -> dict[str, Any]:
+    return image_enrichment.to_metadata()
 
 
 def _block_graph_trace(graph: ParsedMarkdownBlockGraph | None) -> dict[str, Any]:
@@ -323,6 +332,9 @@ def _parsed_image_trace(artifact: ParsedImageArtifact) -> dict[str, Any]:
         "alt_text": artifact.alt_text,
         "caption": artifact.caption,
         "nearby_text": artifact.nearby_text,
+        "ocr_text_present": bool(artifact.ocr_text),
+        "vision_summary_present": bool(artifact.vision_summary),
+        "image_enrichment_status": _image_enrichment_status(artifact.metadata_json),
         "metadata": artifact.metadata_json,
     }
 
@@ -411,6 +423,8 @@ def _image_artifact_row_trace(artifact: ImageArtifact) -> dict[str, Any]:
         "nearby_text": artifact.nearby_text,
         "ocr_text_present": bool(artifact.ocr_text),
         "vision_summary_present": bool(artifact.vision_summary),
+        "vision_summary_preview": _preview(artifact.vision_summary or "") if artifact.vision_summary else None,
+        "image_enrichment_status": _image_enrichment_status(artifact.metadata_json),
         "metadata": artifact.metadata_json,
     }
 
@@ -478,15 +492,24 @@ def _design_delta() -> dict[str, Any]:
             "Artifact-derived chunks for retrieval.",
             "Database rows for table_artifacts and image_artifacts.",
             "Metadata ID resolution after artifact rows and narrative chunks are flushed.",
+            "Optional image-enrichment.json sidecar consumption for image OCR and vision summaries.",
         ],
         "not_yet_implemented": [
             "Persisted source_blocks table or block-level query/read API.",
             "Full public MarkdownBlock AST as an external API contract.",
             "Large table row-group chunk splitting.",
-            "Image OCR or vision summary enrichment.",
             "PDF/HTML/docx artifact extraction.",
         ],
     }
+
+
+def _image_enrichment_status(metadata: dict[str, Any]) -> str:
+    enrichment = metadata.get("image_enrichment")
+    if isinstance(enrichment, dict):
+        status = enrichment.get("status")
+        if isinstance(status, str):
+            return status
+    return "unavailable"
 
 
 def _is_remote_or_data_uri(value: str) -> bool:

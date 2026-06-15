@@ -152,6 +152,7 @@ data/private/ingest-prep/YYYY-MM-DD-source/
   tables/
   source-info.json
   ingest-log.json
+  image-enrichment.json   # optional, agent-generated
 ```
 
 Normalization behavior:
@@ -163,11 +164,37 @@ Normalization behavior:
 * Large tables move to `tables/table-001.md`, with a short reference left in `document.md`.
 * Missing local images produce `soft_fail`; Docling missing, timeout, failed conversion, or empty output produce `hard_fail`.
 
+Optional image enrichment:
+
+* After `prepare-ingest`, an agent with image-capable model access may inspect local files under `assets/` and write `image-enrichment.json`.
+* PKCS does not call a vision API or run a local vision server. It only validates and consumes the sidecar during `ingest_source`.
+* Matching is by normalized asset path, for example `assets/diagram.png`.
+* If the sidecar is missing, invalid, or a single image fails enrichment, ingest continues with deterministic image metadata from Markdown (`alt_text`, `caption`, `nearby_text`).
+
+Sidecar schema v1:
+
+```json
+{
+  "schema_version": 1,
+  "images": [
+    {
+      "asset_path": "assets/diagram.png",
+      "vision_summary": "A system diagram showing retrieval, ranking, and context assembly.",
+      "ocr_text": "Retriever -> Reranker -> Context Pack",
+      "visual_type": "diagram",
+      "key_elements": ["Retriever", "Reranker", "Context Pack"],
+      "confidence": "high"
+    }
+  ]
+}
+```
+
 The intended agent flow is:
 
 ```text
 pkcs-ingest skill
   -> uv run pkcs prepare-ingest <source>
+  -> agent optionally writes image-enrichment.json from local assets/
   -> read document_path from JSON
   -> MCP ingest_source(path=document_path, knowledge_type="document")
 ```
@@ -180,7 +207,7 @@ uv run pkcs ingest <document_path> --knowledge-type document
 
 ### Artifact Ingest Trace
 
-Use `trace-ingest` when debugging Markdown table/image artifact flow. It performs a real single-file ingest, then emits a JSON trace from input metadata through parser output, local image asset resolution, ingest report, and database rows.
+Use `trace-ingest` when debugging Markdown table/image artifact flow. It performs a real single-file ingest, then emits a JSON trace from input metadata through optional image enrichment, parser output, local image asset resolution, ingest report, and database rows.
 
 ```powershell
 uv run pkcs trace-ingest path/to/file.md `
@@ -189,7 +216,7 @@ uv run pkcs trace-ingest path/to/file.md `
   --output data/private/trace-example.json
 ```
 
-The trace shows the current implementation boundary: Markdown is first projected into a transient `MarkdownBlock` graph for chunk planning and debug visibility, then table/image references are objectized and linked to narrative/derived chunks. Persisted `source_blocks`, row-group table splitting, OCR, and vision summaries are not implemented yet.
+The trace shows the current implementation boundary: Markdown is first projected into a transient `MarkdownBlock` graph for chunk planning and debug visibility, then table/image references are objectized and linked to narrative/derived chunks. Optional OCR and vision summaries are consumed from `image-enrichment.json`; PKCS does not generate those summaries by itself. Persisted `source_blocks` and row-group table splitting are not implemented yet.
 
 ## Search
 

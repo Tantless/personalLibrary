@@ -5,6 +5,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
+from pkcs.ingest.image_enrichment import ImageEnrichmentEntry, normalize_enrichment_asset_path
 from pkcs.ingest.models import (
     KNOWLEDGE_TYPE_NAME_AI_CONVERSATION,
     KNOWLEDGE_TYPE_NAME_DOCUMENT,
@@ -101,10 +102,17 @@ def parse_source_file(
     content_bytes: bytes,
     max_chars: int,
     overlap_lines: int,
+    image_enrichments: dict[str, ImageEnrichmentEntry] | None = None,
 ) -> ParsedSource:
     text = _decode_utf8(content_bytes, path)
     if knowledge_type == KNOWLEDGE_TYPE_NAME_DOCUMENT:
-        return _parse_document_source(path=path, text=text, max_chars=max_chars, overlap_lines=overlap_lines)
+        return _parse_document_source(
+            path=path,
+            text=text,
+            max_chars=max_chars,
+            overlap_lines=overlap_lines,
+            image_enrichments=image_enrichments or {},
+        )
     if knowledge_type == KNOWLEDGE_TYPE_NAME_AI_CONVERSATION:
         if path.suffix.lower() == ".jsonl":
             return _parse_ai_jsonl(path=path, text=text, max_chars=max_chars)
@@ -119,7 +127,14 @@ def _decode_utf8(content_bytes: bytes, path: Path) -> str:
         raise IngestParseError(f"{path} is not valid UTF-8 text") from exc
 
 
-def _parse_document_source(*, path: Path, text: str, max_chars: int, overlap_lines: int) -> ParsedSource:
+def _parse_document_source(
+    *,
+    path: Path,
+    text: str,
+    max_chars: int,
+    overlap_lines: int,
+    image_enrichments: dict[str, ImageEnrichmentEntry],
+) -> ParsedSource:
     lines = text.splitlines()
     if not any(line.strip() for line in lines):
         raise IngestParseError("document is empty")
@@ -146,6 +161,7 @@ def _parse_document_source(*, path: Path, text: str, max_chars: int, overlap_lin
             sections=sections,
             max_chars=max_chars,
             overlap_lines=overlap_lines,
+            image_enrichments=image_enrichments,
         )
 
     if not chunks:
@@ -247,10 +263,12 @@ def _chunks_from_markdown_sections(
     sections: list[_Section],
     max_chars: int,
     overlap_lines: int,
+    image_enrichments: dict[str, ImageEnrichmentEntry],
 ) -> tuple[list[ParsedChunk], list[ParsedTableArtifact], list[ParsedImageArtifact], ParsedMarkdownBlockGraph]:
     block_graph = _build_markdown_block_graph(title=title, sections=sections)
     table_artifacts, image_artifacts, artifact_bindings, artifact_by_block_id = _artifacts_from_block_graph(
-        block_graph
+        block_graph,
+        image_enrichments=image_enrichments,
     )
     block_graph = _block_graph_with_artifact_bindings(block_graph, artifact_bindings)
     narrative_chunks: list[ParsedChunk] = []
@@ -719,6 +737,8 @@ def _markdown_block_diagnostics(*, line: str, line_no: int) -> list[dict[str, An
 
 def _artifacts_from_block_graph(
     graph: ParsedMarkdownBlockGraph,
+    *,
+    image_enrichments: dict[str, ImageEnrichmentEntry],
 ) -> tuple[
     list[ParsedTableArtifact],
     list[ParsedImageArtifact],
@@ -760,21 +780,26 @@ def _artifacts_from_block_graph(
         if block.block_type == "image":
             artifact_key = f"img_{len(image_artifacts) + 1:03d}"
             context = _image_context_for_block(blocks=graph.blocks, image_index=block_index)
+            original_uri = str(block.metadata_json["original_uri"])
+            enrichment = image_enrichments.get(normalize_enrichment_asset_path(original_uri))
             artifact = ParsedImageArtifact(
                 artifact_key=artifact_key,
                 line_start=context.line_start,
                 line_end=context.line_end,
                 heading_path=block.heading_path,
-                original_uri=str(block.metadata_json["original_uri"]),
+                original_uri=original_uri,
                 alt_text=_optional_str(block.metadata_json.get("alt_text")),
                 caption=context.caption,
                 nearby_text=context.nearby_text,
+                ocr_text=enrichment.ocr_text if enrichment and not enrichment.is_failed else None,
+                vision_summary=enrichment.vision_summary if enrichment and not enrichment.is_failed else None,
                 metadata_json={
                     "source_block_id": block.block_id,
                     "bound_block_ids": context.bound_block_ids,
                     "source_block_type": block.block_type,
                     "caption_block_ids": context.caption_block_ids,
                     "nearby_text_block_ids": context.nearby_text_block_ids,
+                    **_image_enrichment_metadata(enrichment),
                     **_image_artifact_metadata(block.metadata_json),
                 },
             )
@@ -1106,6 +1131,24 @@ def _image_summary_content(artifact: ParsedImageArtifact) -> str:
         f"Original URI: {artifact.original_uri}",
         f"Locator: {artifact.locator}",
     ]
+    enrichment = artifact.metadata_json.get("image_enrichment")
+    if artifact.vision_summary:
+        parts.append(f"Vision summary: {artifact.vision_summary}")
+    if artifact.ocr_text:
+        parts.append(f"OCR text: {artifact.ocr_text}")
+    if isinstance(enrichment, dict):
+        visual_type = _optional_str(enrichment.get("visual_type"))
+        confidence = _optional_str(enrichment.get("confidence"))
+        key_elements = _list_metadata(enrichment.get("key_elements"))
+        failure_code = _optional_str(enrichment.get("failure_code"))
+        if visual_type:
+            parts.append(f"Visual type: {visual_type}")
+        if key_elements:
+            parts.append(f"Key elements: {', '.join(key_elements)}")
+        if confidence:
+            parts.append(f"Vision confidence: {confidence}")
+        if failure_code:
+            parts.append(f"Vision enrichment failed: {failure_code}")
     if artifact.alt_text:
         parts.append(f"Alt text: {artifact.alt_text}")
     if artifact.caption:
@@ -1230,6 +1273,12 @@ def _image_artifact_metadata(block_metadata: dict[str, Any]) -> dict[str, Any]:
         "reference_id",
     ]
     return {key: block_metadata[key] for key in keys if key in block_metadata}
+
+
+def _image_enrichment_metadata(enrichment: ImageEnrichmentEntry | None) -> dict[str, Any]:
+    if enrichment is None:
+        return {}
+    return {"image_enrichment": enrichment.artifact_metadata()}
 
 
 def _image_context_for_block(*, blocks: list[ParsedMarkdownBlock], image_index: int) -> _ImageBlockContext:

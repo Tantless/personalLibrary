@@ -1,0 +1,8 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis\\spec\\backend\\directory-structure.md", "reason": "Ingest-sidecar code must stay in application/parser layers with thin interfaces."}
+{"file": ".trellis\\spec\\backend\\error-handling.md", "reason": "Invalid or missing image enrichment sidecar must degrade without leaking content."}
+{"file": ".trellis\\spec\\backend\\database-guidelines.md", "reason": "Image artifact persistence must follow existing repository and metadata contracts."}
+{"file": ".trellis\\spec\\guides\\code-reuse-thinking-guide.md", "reason": "Search and reuse existing ingest artifact patterns before adding helpers."}
+{"file": ".trellis\\spec\\backend\\quality-guidelines.md", "reason": "Tests and verification requirements for backend ingest changes."}
+{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "Feature spans sidecar file, parser, service, DB, trace, docs."}

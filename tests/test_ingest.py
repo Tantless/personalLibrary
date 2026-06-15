@@ -124,6 +124,141 @@ def test_ingest_markdown_table_and_image_artifacts(db_session, tmp_path) -> None
     assert image_summary.metadata_json["parent_narrative_chunk_id"] == narrative.id
 
 
+def test_ingest_markdown_image_enrichment_sidecar(db_session, tmp_path) -> None:
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    (assets_dir / "diagram.png").write_bytes(b"diagram")
+    source_path = tmp_path / "document.md"
+    source_path.write_text(
+        "# Enriched Image\n\n"
+        "The diagram explains the retrieval pipeline.\n\n"
+        "![Retrieval architecture](assets/diagram.png)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "image-enrichment.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "images": [
+                    {
+                        "asset_path": "assets/diagram.png",
+                        "vision_summary": "A retrieval architecture diagram with search, ranking, and context assembly.",
+                        "ocr_text": "Search -> Rank -> Context",
+                        "visual_type": "diagram",
+                        "key_elements": ["Search", "Rank", "Context"],
+                        "confidence": "high",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    service = make_service(db_session, tmp_path / "raw", chunk_max_chars=1000)
+
+    report = service.ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:enriched-image-{uuid4().hex}",
+    )
+
+    image = db_session.scalars(select(ImageArtifact).where(ImageArtifact.version_id == report.version_id)).one()
+    version = db_session.get(SourceVersion, report.version_id)
+    chunks = db_session.scalars(select(Chunk).where(Chunk.version_id == report.version_id)).all()
+    image_summary = next(chunk for chunk in chunks if chunk.metadata_json.get("chunk_kind") == "image_summary")
+
+    assert report.status == "completed"
+    assert version is not None
+    assert version.metadata_json["image_enrichment"]["status"] == "loaded"
+    assert version.metadata_json["image_enrichment"]["entry_count"] == 1
+    assert image.vision_summary == "A retrieval architecture diagram with search, ranking, and context assembly."
+    assert image.ocr_text == "Search -> Rank -> Context"
+    assert image.metadata_json["image_enrichment"] == {
+        "status": "matched",
+        "asset_path": "assets/diagram.png",
+        "visual_type": "diagram",
+        "key_elements": ["Search", "Rank", "Context"],
+        "confidence": "high",
+    }
+    assert "Vision summary: A retrieval architecture diagram" in image_summary.content
+    assert "OCR text: Search -> Rank -> Context" in image_summary.content
+    assert "Visual type: diagram" in image_summary.content
+    assert "Key elements: Search, Rank, Context" in image_summary.content
+
+
+def test_ingest_invalid_image_enrichment_sidecar_degrades(db_session, tmp_path) -> None:
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    (assets_dir / "diagram.png").write_bytes(b"diagram")
+    source_path = tmp_path / "document.md"
+    source_path.write_text("# Invalid Sidecar\n\n![Diagram](assets/diagram.png)\n", encoding="utf-8")
+    (tmp_path / "image-enrichment.json").write_text("{not-json", encoding="utf-8")
+    service = make_service(db_session, tmp_path / "raw", chunk_max_chars=1000)
+
+    report = service.ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:invalid-image-sidecar-{uuid4().hex}",
+    )
+
+    image = db_session.scalars(select(ImageArtifact).where(ImageArtifact.version_id == report.version_id)).one()
+    version = db_session.get(SourceVersion, report.version_id)
+
+    assert report.status == "completed"
+    assert version is not None
+    assert version.metadata_json["image_enrichment"]["status"] == "invalid"
+    assert version.metadata_json["image_enrichment"]["issues"][0]["code"] == "invalid_image_enrichment_json"
+    assert image.vision_summary is None
+    assert image.ocr_text is None
+    assert "image_enrichment" not in image.metadata_json
+
+
+def test_ingest_per_image_enrichment_failure_degrades(db_session, tmp_path) -> None:
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    (assets_dir / "broken.png").write_bytes(b"broken")
+    source_path = tmp_path / "document.md"
+    source_path.write_text("# Failed Image\n\n![Broken](assets/broken.png)\n", encoding="utf-8")
+    (tmp_path / "image-enrichment.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "images": [
+                    {
+                        "asset_path": "assets/broken.png",
+                        "failure_code": "image_unreadable",
+                        "failure_message": "image could not be decoded",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    service = make_service(db_session, tmp_path / "raw", chunk_max_chars=1000)
+
+    report = service.ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:failed-image-enrichment-{uuid4().hex}",
+    )
+
+    image = db_session.scalars(select(ImageArtifact).where(ImageArtifact.version_id == report.version_id)).one()
+    chunks = db_session.scalars(select(Chunk).where(Chunk.version_id == report.version_id)).all()
+    image_summary = next(chunk for chunk in chunks if chunk.metadata_json.get("chunk_kind") == "image_summary")
+
+    assert report.status == "completed"
+    assert image.vision_summary is None
+    assert image.ocr_text is None
+    assert image.metadata_json["image_enrichment"] == {
+        "status": "failed",
+        "asset_path": "assets/broken.png",
+        "failure_code": "image_unreadable",
+        "failure_message": "image could not be decoded",
+    }
+    assert "Vision enrichment failed: image_unreadable" in image_summary.content
+
+
 def test_ingest_markdown_common_image_syntax_artifacts(db_session, tmp_path) -> None:
     asset_dir = tmp_path / "images"
     asset_dir.mkdir()

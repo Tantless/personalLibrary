@@ -68,6 +68,8 @@ class ParsedImageArtifact:
     alt_text: str | None = None
     caption: str | None = None
     nearby_text: str | None = None
+    ocr_text: str | None = None
+    vision_summary: str | None = None
     metadata_json: dict[str, Any] = field(default_factory=dict)
 
     @property

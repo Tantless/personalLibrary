@@ -52,9 +52,18 @@ def test_artifact_ingest_trace_outputs_parse_to_database_flow(db_session, tmp_pa
     )
 
     assert trace["trace_version"] == "artifact_ingest_trace_v2"
-    assert trace["stage_order"] == ["input", "block_graph", "parser", "asset_resolution", "ingest_report", "database"]
+    assert trace["stage_order"] == [
+        "input",
+        "image_enrichment",
+        "block_graph",
+        "parser",
+        "asset_resolution",
+        "ingest_report",
+        "database",
+    ]
     assert "Transient explicit MarkdownBlock graph" in " ".join(trace["design_delta"]["implemented"])
     assert "Persisted source_blocks table" in " ".join(trace["design_delta"]["not_yet_implemented"])
+    assert trace["image_enrichment"]["status"] == "missing"
     assert trace["input"]["line_count"] >= 10
     assert trace["block_graph"]["available"] is True
     assert trace["block_graph"]["counts"]["block_types"]["table"] == 1
@@ -97,6 +106,50 @@ def test_artifact_ingest_trace_outputs_parse_to_database_flow(db_session, tmp_pa
     assert image_summary["source_block_id"]
     assert image_summary["bound_block_ids"]
     assert image_summary["parent_narrative_chunk_id"] == narrative["id"]
+
+
+def test_artifact_ingest_trace_reports_image_enrichment(db_session, tmp_path) -> None:
+    token = uuid4().hex
+    source_path = write_artifact_markdown(tmp_path, token)
+    (tmp_path / "image-enrichment.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "images": [
+                    {
+                        "asset_path": "images/flow.png",
+                        "vision_summary": "A parser to ingest flow diagram with artifact persistence.",
+                        "ocr_text": "Parser -> Ingest",
+                        "visual_type": "diagram",
+                        "key_elements": ["Parser", "Ingest"],
+                        "confidence": "high",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    service = make_trace_service(db_session, tmp_path / "raw")
+
+    trace = service.trace_ingest(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:trace-enriched-{token}",
+    )
+
+    parsed_image = trace["parser"]["image_artifacts"][0]
+    database_image = trace["database"]["image_artifacts"][0]
+    image_summary = next(chunk for chunk in trace["database"]["chunks"] if chunk["chunk_kind"] == "image_summary")
+
+    assert trace["image_enrichment"]["status"] == "loaded"
+    assert trace["image_enrichment"]["entry_count"] == 1
+    assert parsed_image["image_enrichment_status"] == "matched"
+    assert parsed_image["vision_summary_present"] is True
+    assert database_image["image_enrichment_status"] == "matched"
+    assert database_image["vision_summary_present"] is True
+    assert "parser to ingest flow diagram" in database_image["vision_summary_preview"]
+    assert "Vision summary: A parser to ingest flow diagram" in image_summary["content_preview"]
 
 
 def test_markdown_block_graph_marks_overlap_artifact_links_as_context(tmp_path) -> None:

@@ -31,6 +31,7 @@ src/pkcs/
 ├── ingest/
 │   ├── models.py           # Ingest report/parser data contracts
 │   ├── parsers.py          # File parsing and chunk construction
+│   ├── image_enrichment.py # Optional image-enrichment sidecar schema/validation
 │   └── service.py          # Ingest application workflow
 ├── mcp/server.py           # FastMCP tool wiring
 ├── reader/
@@ -50,6 +51,7 @@ src/pkcs/
 - Application services own transaction orchestration, input validation, and cross-repository workflows.
 - Parsers return plain data models and must not write to the database or filesystem.
 - Markdown artifact-aware parsers return `ParsedChunk`, `ParsedTableArtifact`, `ParsedImageArtifact`, and an optional transient `ParsedMarkdownBlockGraph`; they do not create ORM rows or copy image assets.
+- Image enrichment sidecar loading belongs in `src/pkcs/ingest/image_enrichment.py` and `IngestService`; parsers may consume already-validated enrichment entries but must not read `image-enrichment.json` from disk.
 - `ParsedMarkdownBlockGraph` is an ingest/chunk-planning debug contract only. It may be exposed by `trace-ingest`, but it must not create a `source_blocks` table, repository, search API, or read API without a separate PRD.
 - Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
 - Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.

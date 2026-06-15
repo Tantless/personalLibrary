@@ -19,14 +19,16 @@ from pkcs.db.repositories import (
     TableArtifactRepository,
 )
 from pkcs.db.session import create_session_factory
+from pkcs.ingest.image_enrichment import ImageEnrichmentSidecar, load_image_enrichment_sidecar
 from pkcs.ingest.models import (
+    KNOWLEDGE_TYPE_NAME_DOCUMENT,
     SUPPORTED_EXTENSIONS,
     SUPPORTED_KNOWLEDGE_TYPES,
     IngestItemReport,
     IngestReport,
     ParsedSource,
 )
-from pkcs.ingest.parsers import IngestParseError, parse_source_file
+from pkcs.ingest.parsers import parse_source_file
 from pkcs.source_metadata import (
     canonical_key_prefix_for_knowledge_type,
     knowledge_type_code_for_name,
@@ -185,7 +187,11 @@ class IngestService:
         normalized_format_code = normalized_format_code_for_source_format(source_format_code)
         resolved_path = path.resolve()
         content_bytes = resolved_path.read_bytes()
-        content_hash = hashlib.sha256(content_bytes).hexdigest()
+        image_enrichment = self._load_image_enrichment(
+            path=resolved_path,
+            knowledge_type=knowledge_type,
+        )
+        content_hash = self._content_hash(content_bytes=content_bytes, image_enrichment=image_enrichment)
         resolved_canonical_key = canonical_key or self._allocate_canonical_key(session, knowledge_type_code)
 
         source_repo = SourceRepository(session)
@@ -217,6 +223,7 @@ class IngestService:
             content_bytes=content_bytes,
             max_chars=self.chunk_max_chars,
             overlap_lines=self.chunk_overlap_lines,
+            image_enrichments=image_enrichment.entries_by_asset_path,
         )
 
         created_new_source = existing_source is None
@@ -248,6 +255,7 @@ class IngestService:
                 "source_format": source_format_name(source_format_code),
                 "normalized_format": normalized_format_name(normalized_format_code),
                 "knowledge_type": knowledge_type,
+                **self._image_enrichment_version_metadata(image_enrichment, parsed),
             },
         )
 
@@ -385,6 +393,8 @@ class IngestService:
                 alt_text=artifact.alt_text,
                 caption=artifact.caption,
                 nearby_text=artifact.nearby_text,
+                ocr_text=artifact.ocr_text,
+                vision_summary=artifact.vision_summary,
                 metadata_json={
                     **artifact.metadata_json,
                     "artifact_key": artifact.artifact_key,
@@ -419,6 +429,30 @@ class IngestService:
             artifact_key=artifact_key,
             original_path=candidate,
         ).as_posix()
+
+    def _load_image_enrichment(self, *, path: Path, knowledge_type: str) -> ImageEnrichmentSidecar:
+        if knowledge_type != KNOWLEDGE_TYPE_NAME_DOCUMENT:
+            return ImageEnrichmentSidecar(status="not_applicable")
+        return load_image_enrichment_sidecar(path)
+
+    def _content_hash(self, *, content_bytes: bytes, image_enrichment: ImageEnrichmentSidecar) -> str:
+        digest = hashlib.sha256()
+        digest.update(content_bytes)
+        if image_enrichment.content_sha256 is not None:
+            digest.update(b"\n--pkcs-image-enrichment--\n")
+            digest.update(image_enrichment.content_sha256.encode("ascii"))
+        return digest.hexdigest()
+
+    def _image_enrichment_version_metadata(
+        self,
+        image_enrichment: ImageEnrichmentSidecar,
+        parsed: ParsedSource,
+    ) -> dict[str, Any]:
+        if image_enrichment.status == "missing" and not parsed.image_artifacts:
+            return {}
+        if image_enrichment.status == "not_applicable":
+            return {}
+        return {"image_enrichment": image_enrichment.to_metadata()}
 
     def _chunk_metadata_with_artifact_refs(
         self,

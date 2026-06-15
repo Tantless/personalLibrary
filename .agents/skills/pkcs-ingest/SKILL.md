@@ -13,6 +13,7 @@ description: "当用户明确要求把本地 Markdown、PDF、DOCX、XLSX、HTML
 用户提供本地文件
   -> agent 运行 uv run pkcs prepare-ingest
   -> 生成 document.md + assets/ + tables/ + source-info.json + ingest-log.json
+  -> agent 根据 assets/ 中的本地图片生成可选 image-enrichment.json
   -> agent 调用 MCP ingest_source(path=document.md)
   -> 返回摄入结果
 ```
@@ -68,9 +69,48 @@ uv run pkcs prepare-ingest <source-path> `
 - `soft_fail`: 默认暂停，说明 warning；用户接受降级摄入后再继续。
 - `hard_fail`: 停止，报告 `errors` 和 `ingest_log_path`。
 
-### 2. Call MCP Ingest
+### 2. Enrich Local Images
 
-`prepare-ingest` 成功后，调用 PKCS MCP tool：
+如果 package 的 `assets/` 中存在本地图片，且当前 agent CLI 使用的模型支持图片理解，则在调用 MCP ingest 前分析这些图片并写入：
+
+```text
+<prep_dir>/image-enrichment.json
+```
+
+MVP schema：
+
+```json
+{
+  "schema_version": 1,
+  "images": [
+    {
+      "asset_path": "assets/diagram.png",
+      "vision_summary": "A system diagram showing retrieval, ranking, and context assembly.",
+      "ocr_text": "Retriever -> Reranker -> Context Pack",
+      "visual_type": "diagram",
+      "key_elements": ["Retriever", "Reranker", "Context Pack"],
+      "confidence": "high"
+    }
+  ]
+}
+```
+
+要求：
+
+- `asset_path` 使用 package 内 normalized path，例如 `assets/diagram.png`。
+- `vision_summary` 用于后续检索和上下文生成，应描述图片表达的关键信息。
+- `ocr_text` 没有可读文字时写空字符串或省略。
+- `visual_type` 使用 `diagram`、`chart`、`screenshot`、`photo`、`other`。
+- `confidence` 使用 `high`、`medium`、`low`。
+- 单张图片理解失败时，可写 `failure_code` / `failure_message`，不要中断整个 ingest。
+
+不要要求用户单独配置视觉模型 API，也不要在 PKCS 内启动本地视觉服务。图片理解由当前 agent 能力完成；PKCS 只消费 `image-enrichment.json`。
+
+如果当前 agent 不具备图片理解能力，或者图片分析失败，可以跳过该文件，继续 MCP ingest。PKCS 会保留 Markdown 中已有的 alt/caption/nearby 信息。
+
+### 3. Call MCP Ingest
+
+`prepare-ingest` 成功，且可选图片理解步骤完成后，调用 PKCS MCP tool：
 
 ```text
 ingest_source(
@@ -82,13 +122,14 @@ ingest_source(
 
 `canonical_key` 仅在用户明确提供稳定身份时传入。用户没有提供时，让 PKCS 自动生成。
 
-### 3. Report Result
+### 4. Report Result
 
 向用户报告：
 
 - `prepare-ingest` status
 - `document_path`
 - local image / remote image / missing image 计数
+- `image-enrichment.json` 是否生成；如未生成，说明已按普通图片 metadata 降级摄入
 - inline table / sidecar table 计数
 - MCP ingest status、`source_id`、`version_id`、`canonical_key`
 - 影响资料保真度的 warnings
@@ -104,6 +145,7 @@ data/private/ingest-prep/YYYY-MM-DD-source-slug/
   tables/
   source-info.json
   ingest-log.json
+  image-enrichment.json  # 可选，agent 生成
 ```
 
 规范化行为：
@@ -113,6 +155,7 @@ data/private/ingest-prep/YYYY-MM-DD-source-slug/
 - 远程图片 URL 保持原样，默认不下载。
 - 小表保留 Markdown table。
 - 大表保存到 `tables/table-001.md`，`document.md` 中保留 `Table: ...` 引用。
+- 可选图片理解信息写入 `image-enrichment.json`，MCP ingest 会消费该文件生成 image artifact 的 `vision_summary` / `ocr_text`。
 - 转换和校验问题写入 `ingest-log.json`。
 
 ## Failure Handling
@@ -121,6 +164,7 @@ data/private/ingest-prep/YYYY-MM-DD-source-slug/
 
 - Docling 未安装：PDF/DOCX/XLSX/HTML 会返回 `hard_fail`，提示安装外部 `docling` CLI。
 - 本地图片缺失：返回 `soft_fail`，保留原引用并记录搜索路径。
+- 图片理解不可用或失败：不阻断 ingest；跳过 `image-enrichment.json` 或记录单图失败信息。
 - Docling 转换超时或失败：返回 `hard_fail`，记录短错误摘要。
 - `document.md` 为空：返回 `hard_fail`。
 
@@ -151,3 +195,5 @@ uv run pkcs prepare-ingest C:\path\README.md --output-root data/private/ingest-p
 ```
 
 检查 JSON 中 `missing_local_images`。如果为 0，调用 MCP `ingest_source` 摄入 `document_path`。
+
+如果 `assets/` 中有图片，并且当前 agent 支持视觉理解，先生成 `image-enrichment.json`，再调用 MCP `ingest_source`。

@@ -63,6 +63,31 @@ IngestJobRepository.create_job(knowledge_type_code, input_name, status="started"
 IngestJobRepository.finish_job(job, status, summary_json, error_message=None)
 ```
 
+Image enrichment sidecar:
+
+```python
+load_image_enrichment_sidecar(document_path: Path) -> ImageEnrichmentSidecar
+parse_source_file(..., image_enrichments: dict[str, ImageEnrichmentEntry] | None = None) -> ParsedSource
+```
+
+`image-enrichment.json` v1:
+
+```json
+{
+  "schema_version": 1,
+  "images": [
+    {
+      "asset_path": "assets/diagram.png",
+      "vision_summary": "A system diagram showing retrieval, ranking, and context assembly.",
+      "ocr_text": "Retriever -> Reranker -> Context Pack",
+      "visual_type": "diagram",
+      "key_elements": ["Retriever", "Reranker", "Context Pack"],
+      "confidence": "high"
+    }
+  ]
+}
+```
+
 Search signatures:
 
 ```python
@@ -144,6 +169,9 @@ Markdown artifact chunk metadata:
 - Table derived chunks use `chunk_kind="table_summary"` or `chunk_kind="table_rows"` plus `artifact_type="table"`, `artifact_key`, `artifact_id`, `artifact_locator`, `source_block_id`, `bound_block_ids`, and `parent_narrative_chunk_id`.
 - Image derived chunks use `chunk_kind="image_summary"` plus `artifact_type="image"`, `artifact_key`, `artifact_id`, `artifact_locator`, `source_block_id`, `bound_block_ids`, and `parent_narrative_chunk_id`.
 - Image artifact `metadata_json` may include deterministic parser metadata: `image_syntax`, `container`, `image_title`, `outer_link_url`, `outer_link_title`, `html_attrs`, `reference_id`, `caption_block_ids`, and `nearby_text_block_ids`.
+- Image artifact `metadata_json.image_enrichment` may include agent-generated enrichment status. Successful entries use `status="matched"`, `asset_path`, `visual_type`, `key_elements`, and `confidence`; failed per-image entries use `status="failed"`, `asset_path`, `failure_code`, and optional `failure_message`.
+- Image artifact `ocr_text` and `vision_summary` are populated only from validated `image-enrichment.json` entries. PKCS must not call a vision model from the ingest service, CLI, or MCP server.
+- Source version `metadata_json.image_enrichment` records sidecar-level status (`loaded`, `missing`, or `invalid`), entry count, optional sidecar hash, and short issues. It must not store full source text or image bytes.
 - Image `bound_block_ids` contains the source image block plus any caption/nearby blocks that are attached during transient block graph planning. `source_block_id` remains the primary visible image block.
 - Placeholder text such as `[Table tbl_001: ...]` is readability-only. Code must use `metadata_json` and artifact table primary keys for reliable linking.
 - Do not add persisted `source_blocks` rows for the transient graph. Persist only the block references required in existing artifact/chunk metadata unless a separate schema PRD is accepted.
@@ -209,6 +237,9 @@ Pytest database isolation:
 | Invalid locator | Raises reader input error | Reader tests assert invalid locator failure |
 | Context Pack evidence selected | Each item maps back to `read_source(chunk_id=...)` | Context Pack tests compare evidence content with read_source |
 | Context Pack evidence references Markdown artifacts | Evidence content includes hydrated artifact details without losing source refs | Context Pack artifact hydration test |
+| Valid `image-enrichment.json` exists beside `document.md` | Matching image artifacts persist `ocr_text`, `vision_summary`, and enrichment metadata; image summary chunks include those fields | Ingest image enrichment sidecar test |
+| Invalid `image-enrichment.json` exists | Ingest continues; source version metadata records invalid sidecar issue; image artifacts fall back to Markdown metadata | Ingest invalid sidecar degradation test |
+| Per-image enrichment failure entry exists | Image artifact is created without OCR/vision text; `metadata_json.image_enrichment.status` is `failed` with failure code | Per-image enrichment failure test |
 | Multiple adjacent chunks from one source | Per-source cap limits source dominance | Context Pack tests assert per-source cap |
 | Soft budget set | Markdown gets shorter but structured evidence remains traceable | Context Pack budget test |
 | Table or column exists in public schema | PostgreSQL comment is present, non-empty, and formatted as `<中文名>：<一句话解释>` | Schema test queries `obj_description` and `col_description` |
@@ -259,10 +290,10 @@ PKCS_TEST_DATABASE_URL=postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs
 - `tests/test_database_schema.py`: foreign key column comments must include the referenced table and column.
 - `tests/test_repositories.py`: repository write/read behavior, including table/image artifact repositories, and caller-owned commit.
 - `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
-- `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, generated canonical keys, Raw Archive read-back after input deletion, Markdown table/image artifacts, asset copying, and ingest job summaries.
+- `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, generated canonical keys, Raw Archive read-back after input deletion, Markdown table/image artifacts, asset copying, image enrichment sidecar success/failure degradation, and ingest job summaries.
 - `tests/test_search.py`: PostgreSQL FTS query, title boost, filters, top_k, no-results, artifact-derived chunk retrieval, and interface smoke tests.
 - `tests/test_reader.py`: `chunk_id`, source/version/locator, `context_lines`, invalid locator, CLI, and MCP.
-- `tests/test_context_pack.py`: evidence caps, per-source limit, budget, caveats, read_source mapping, CLI, and MCP.
+- `tests/test_context_pack.py`: evidence caps, per-source limit, budget, caveats, read_source mapping, image artifact hydration including vision/OCR fields, CLI, and MCP.
 - Full PR-sized database changes must run `uv run pytest` with Docker PostgreSQL healthy.
 
 ### 7. Wrong vs Correct
@@ -312,6 +343,15 @@ fragment = read_source_service.read_source(chunk_id=result.chunk_id)
 ```
 
 Do not put evidence content into a Context Pack without refs that can be read back.
+
+Image enrichment must stay sidecar-driven:
+
+```python
+image_enrichment = load_image_enrichment_sidecar(resolved_path)
+parsed = parse_source_file(..., image_enrichments=image_enrichment.entries_by_asset_path)
+```
+
+Do not call a remote vision API or local vision service from `IngestService`, `parse_source_file()`, CLI, or MCP server.
 
 Markdown artifact linking must use metadata and primary keys:
 
@@ -366,3 +406,4 @@ Pytest owns this disposable database and may drop/recreate it at session startup
 - Building Context Pack evidence directly from snippets only; snippets are not enough for read-back traceability.
 - Treating Markdown artifact placeholders as durable links. They are display text; `metadata_json.artifact_id` is the durable link.
 - Running pytest against the development database. Temporary Raw Archive paths and synthetic fixtures belong only in the disposable `_test` database.
+- Treating image enrichment as a hard ingest dependency. Missing or invalid `image-enrichment.json` must degrade to ordinary image artifact ingest.

@@ -223,12 +223,27 @@ class ContextPackService:
         ]
 
     def _image_artifact_lines(self, artifact: ImageArtifact) -> list[str]:
-        description = artifact.alt_text or artifact.caption or artifact.original_uri
+        description = artifact.vision_summary or artifact.alt_text or artifact.caption or artifact.original_uri
         lines = [f"- Image {artifact.artifact_key} ({artifact.locator}): {description}"]
+        if artifact.ocr_text:
+            lines.append(f"  OCR: {artifact.ocr_text}")
         if artifact.asset_path:
             lines.append(f"  Asset: {artifact.asset_path}")
         if artifact.nearby_text:
             lines.append(f"  Nearby: {artifact.nearby_text}")
+        enrichment = artifact.metadata_json.get("image_enrichment")
+        if isinstance(enrichment, dict):
+            visual_type = enrichment.get("visual_type")
+            key_elements = enrichment.get("key_elements")
+            confidence = enrichment.get("confidence")
+            if isinstance(visual_type, str):
+                lines.append(f"  Visual type: {visual_type}")
+            if isinstance(key_elements, list) and key_elements:
+                elements = [item for item in key_elements if isinstance(item, str)]
+                if elements:
+                    lines.append(f"  Key elements: {', '.join(elements)}")
+            if isinstance(confidence, str):
+                lines.append(f"  Vision confidence: {confidence}")
         return lines
 
     def _build_sources(self, evidence: list[ContextPackEvidence]) -> list[ContextPackSource]:

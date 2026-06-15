@@ -207,3 +207,22 @@ PR3: Skill and docs after verified implementation
 * Update `pkcs-ingest` skill to instruct the agent to generate `image-enrichment.json` after `prepare-ingest`.
 * Update README only after code and tests confirm the end-to-end chain.
 * Add an acceptance example using a prepared package with local images.
+
+## Implementation Result
+
+Completed on 2026-06-15.
+
+* Added `src/pkcs/ingest/image_enrichment.py` to load and validate optional `image-enrichment.json` sidecars.
+* Extended `ParsedImageArtifact` and ingest persistence to carry `ocr_text`, `vision_summary`, and enrichment metadata.
+* Parser now receives preloaded enrichment entries and includes vision/OCR text in image summary chunks.
+* `IngestService` reads sidecars before parsing and includes sidecar hash in version content hash when present, so changed enrichment can create a new source version for the same canonical key.
+* Invalid or missing sidecars degrade without blocking ingest.
+* Trace output includes image enrichment stage and per-image enrichment status.
+* Context Pack image artifact hydration includes vision summary, OCR, visual type, key elements, and confidence when present.
+* `pkcs-ingest` skill and README document the complete skill -> prepare-ingest -> agent image enrichment -> MCP ingest loop.
+
+Verification:
+
+* `uv run pytest tests/test_ingest.py tests/test_ingest_trace.py tests/test_context_pack.py -q` -> 23 passed.
+* `uv run alembic upgrade head` -> passed.
+* `uv run pytest -q` -> 58 passed, 1 existing Starlette/TestClient warning.

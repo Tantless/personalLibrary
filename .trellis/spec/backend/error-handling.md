@@ -37,6 +37,7 @@ IngestItemReport.error              # short reason, no source content
 
 - `IngestInputError` covers invalid local path usage, unsupported knowledge types, unsupported extensions, URLs, and ambiguous directory canonical keys.
 - `IngestParseError` covers invalid UTF-8, invalid JSONL, empty documents, and parser output with no chunks.
+- Invalid or missing `image-enrichment.json` is not an `IngestParseError`. It is a non-blocking image enrichment degradation recorded in source version/image artifact metadata.
 - `ingest_source()` creates an `ingest_jobs` row before validating the input path existence so failed local path attempts are recorded.
 - Directory ingest catches per-file exceptions, rolls back that file, records a failed item, and continues.
 - Interface layers should return the report shape rather than hiding item failures.
@@ -68,6 +69,9 @@ Context Pack behavior:
 | Unsupported single-file extension | Report status `failed`, one failed item |
 | Unsupported file inside directory | Report status `skipped` or `completed_with_errors`, skipped item |
 | Invalid UTF-8 file inside directory | Failed item, remaining files still ingest |
+| Missing `image-enrichment.json` | Ingest continues with Markdown-derived image metadata |
+| Invalid `image-enrichment.json` | Ingest continues; source version metadata records the sidecar issue |
+| Single image enrichment failure | Image artifact is created; failure code/message are stored in image artifact metadata |
 | Duplicate content hash | Report status `skipped`, no new chunks |
 | Empty search query | `SearchInputError` |
 | Unsupported search `knowledge_type` | `SearchInputError` |
@@ -107,6 +111,7 @@ for file_path in files:
 - `tests/test_reader.py::test_read_source_invalid_locator_and_missing_chunk_errors`
 - `tests/test_context_pack.py::test_context_pack_no_results_returns_empty_evidence_with_caveats`
 - Add a test whenever a new error status or input validation branch is introduced.
+- Image enrichment sidecar failures must have degradation tests rather than failed ingest report tests.
 
 ### 7. Wrong vs Correct
 

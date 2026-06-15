@@ -160,6 +160,25 @@ def test_context_pack_hydrates_linked_markdown_artifacts(db_session, tmp_path) -
         "![Retrieval flow](assets/flow.png)\n",
         encoding="utf-8",
     )
+    (tmp_path / "image-enrichment.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "images": [
+                    {
+                        "asset_path": "assets/flow.png",
+                        "vision_summary": "A retrieval flow diagram from search to candidate chunks.",
+                        "ocr_text": "Search -> Candidate chunks",
+                        "visual_type": "diagram",
+                        "key_elements": ["Search", "Candidate chunks"],
+                        "confidence": "high",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     make_ingest_service(db_session, tmp_path / "raw").ingest_source(
         path=source_path,
         knowledge_type="document",
@@ -175,7 +194,10 @@ def test_context_pack_hydrates_linked_markdown_artifacts(db_session, tmp_path) -
     assert "Table tbl_001" in content
     assert "Columns: Stage, Output; rows: 1" in content
     assert "Image img_001" in content
-    assert "Retrieval flow" in content
+    assert "A retrieval flow diagram from search to candidate chunks." in content
+    assert "OCR: Search -> Candidate chunks" in content
+    assert "Visual type: diagram" in content
+    assert "Key elements: Search, Candidate chunks" in content
     assert "Asset:" in content
 
 
