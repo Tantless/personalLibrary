@@ -2,8 +2,8 @@
   "id": "06-15-pkcs-ingest-normalization-tooling",
   "name": "06-15-pkcs-ingest-normalization-tooling",
   "title": "brainstorm: PKCS ingest normalization tooling with Docling",
-  "description": "",
-  "status": "planning",
+  "description": "Introduce prepare-ingest normalization tooling with external Docling CLI and validate prepare-ingest -> MCP ingest_source chain.",
+  "status": "review",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 4,
   "next_action": [
     {
       "phase": 1,
@@ -42,12 +42,31 @@
       "action": "record-session"
     }
   ],
-  "commit": null,
+  "commit": "97b511e",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
-  "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "relatedFiles": [
+    ".trellis/tasks/06-15-pkcs-ingest-normalization-tooling/prd.md",
+    ".trellis/tasks/06-15-pkcs-ingest-normalization-tooling/acceptance-report.md",
+    ".agents/skills/pkcs-ingest/SKILL.md",
+    "README.md",
+    "src/pkcs/cli.py",
+    "src/pkcs/ingest/normalization.py",
+    "tests/test_ingest_normalization.py"
+  ],
+  "notes": "Implemented prepare-ingest package generation and validated the prepare-ingest -> MCP ingest_source chain. Awaiting user acceptance.",
+  "meta": {
+    "dependency_strategy": "Use external docling CLI first; evaluate optional docling-slim dependency after stable acceptance.",
+    "verification": [
+      "docker compose ps postgres",
+      "uv run alembic upgrade head",
+      "uv run pytest tests/test_ingest_normalization.py -q",
+      "uv run pytest tests/test_ingest.py tests/test_ingest_trace.py tests/test_context_pack.py tests/test_search.py tests/test_ingest_normalization.py -q",
+      "uv run pytest",
+      "git diff --check"
+    ],
+    "test_result": "54 passed, 1 warning"
+  }
 }

@@ -25,6 +25,7 @@ Completed PR-sized steps:
 * PR5: Raw Archive backed `read_source`, CLI read, MCP `read_source`, `chunk_id` and source/version/locator addressing.
 * PR6: Context Pack v0 JSON + Markdown, evidence caps, per-source limits, soft `budget_tokens`, Caveats, CLI context-pack, MCP `get_context_pack`.
 * PR7: synthetic MVP fixture corpus, `eval_queries.jsonl`, retrieval thresholds, final CLI flow, and MCP generic client fallback smoke test.
+* PR8: `prepare-ingest` pre-ingest normalizer for Markdown/PDF/DOCX/XLSX/HTML single files, package generation, and MCP `ingest_source` chain validation.
 
 ## Local Setup
 
@@ -103,6 +104,79 @@ Directory behavior:
 * A failed file is reported in `failed` and does not stop other files.
 
 The ingest report includes `ingest_job_id`, source/version refs, `canonical_key`, `content_hash`, chunk count, and `succeeded`/`skipped`/`failed` item lists. Item records include `input_name`, not the original full input path.
+
+### Pre-Ingest Normalization
+
+Use `prepare-ingest` when a source file should be normalized into Markdown before MCP ingest.
+
+Supported single-file inputs:
+
+* Markdown: `.md`, `.markdown`, `.mdx`
+* Docling-backed conversion: `.pdf`, `.docx`, `.xlsx`, `.html`, `.htm`
+
+Markdown inputs work after `uv sync`. PDF/DOCX/XLSX/HTML conversion requires an external `docling` CLI on `PATH`; Docling is intentionally not a mandatory PKCS runtime dependency.
+
+From a fresh machine:
+
+```powershell
+uv sync
+docker compose up -d postgres
+uv run alembic upgrade head
+```
+
+For non-Markdown inputs, install Docling separately and confirm the CLI is available:
+
+```powershell
+uv tool install docling
+docling --version
+```
+
+If that install path is not suitable, use Docling's official installation instructions. PKCS only requires that `docling` is callable from the shell used by `uv run pkcs prepare-ingest`.
+
+Prepare a source file:
+
+```powershell
+uv run pkcs prepare-ingest C:\path\source.pdf `
+  --output-root data/private/ingest-prep `
+  --slug source
+```
+
+The command returns JSON with `status`, `document_path`, `prep_dir`, `source_info_path`, `ingest_log_path`, `counts`, `warnings`, and `errors`.
+
+It creates:
+
+```text
+data/private/ingest-prep/YYYY-MM-DD-source/
+  document.md
+  assets/
+  tables/
+  source-info.json
+  ingest-log.json
+```
+
+Normalization behavior:
+
+* Local images are copied to `assets/`, and Markdown/HTML/reference image links are rewritten.
+* Remote image URLs are kept as URLs and are not downloaded by default.
+* Image filename collisions use numeric suffixes such as `logo-2.png`.
+* Small Markdown tables stay inline.
+* Large tables move to `tables/table-001.md`, with a short reference left in `document.md`.
+* Missing local images produce `soft_fail`; Docling missing, timeout, failed conversion, or empty output produce `hard_fail`.
+
+The intended agent flow is:
+
+```text
+pkcs-ingest skill
+  -> uv run pkcs prepare-ingest <source>
+  -> read document_path from JSON
+  -> MCP ingest_source(path=document_path, knowledge_type="document")
+```
+
+For local debugging without MCP, the prepared file can also be ingested through the CLI:
+
+```powershell
+uv run pkcs ingest <document_path> --knowledge-type document
+```
 
 ### Artifact Ingest Trace
 

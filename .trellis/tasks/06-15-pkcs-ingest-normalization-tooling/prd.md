@@ -40,15 +40,15 @@
 
 ## Acceptance Criteria (evolving)
 
-* [ ] Markdown 输入可生成规范化 package，并可被现有 PKCS ingest 成功摄入。
-* [ ] PDF 输入可通过 Docling 转为 `document.md`，并保留可解析的图片/表格引用。
-* [ ] DOCX 输入可通过 Docling 转为 `document.md`。
-* [ ] XLSX 输入可生成 Markdown 摘要与 `tables/` 侧车文件。
-* [ ] HTML 输入可通过 Docling 转为 `document.md`，本地图片资源可被复制到 `assets/`。
-* [ ] 缺失本地图片、Docling 不可用、转换失败等场景有可追踪日志。
-* [ ] 生成的 `document.md` 可通过 MCP `ingest_source` 完成 ingest。
-* [ ] `pkcs-ingest` skill 说明 agent 如何执行 `pre-ingest command -> MCP ingest_source` 链路。
-* [ ] `prepare-ingest` CLI 返回 JSON，包含 `status`、`prep_dir`、`document_path`、`source_info_path`、`ingest_log_path`、`counts`、`warnings`、`errors`。
+* [x] Markdown 输入可生成规范化 package，并可被现有 PKCS ingest 成功摄入。
+* [x] PDF 输入可通过 Docling 转为 `document.md`，并保留可解析的图片/表格引用。
+* [x] DOCX 输入可通过 Docling 转为 `document.md`。
+* [x] XLSX 输入可生成 Markdown 摘要与 `tables/` 侧车文件。
+* [x] HTML 输入可通过 Docling 转为 `document.md`，本地图片资源可被复制到 `assets/`。
+* [x] 缺失本地图片、Docling 不可用、转换失败等场景有可追踪日志。
+* [x] 生成的 `document.md` 可通过 MCP `ingest_source` 完成 ingest。
+* [x] `pkcs-ingest` skill 说明 agent 如何执行 `pre-ingest command -> MCP ingest_source` 链路。
+* [x] `prepare-ingest` CLI 返回 JSON，包含 `status`、`prep_dir`、`document_path`、`source_info_path`、`ingest_log_path`、`counts`、`warnings`、`errors`。
 
 ## Definition of Done (team quality bar)
 
