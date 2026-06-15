@@ -27,11 +27,14 @@
 * 支持对 Markdown 中已识别的本地图片 block 生成结构化视觉理解信息。
 * 视觉理解应由 agent CLI 能力完成，而不是要求用户配置独立视觉 API 或本地服务。
 * 结果应能被后续 MCP ingest 消费，并生成更完整的 image artifact。
+* 用户入口保持为 `pkcs-ingest` skill：skill 编排 pre-ingest、图片理解、MCP ingest，而不是让用户手动拼接步骤。
+* `prepare-ingest` / Docling 先生成标准 package；图片理解只处理 package 中已经规范化的本地图片资产。
+* block 生成 image 对象时消费图片理解旁车信息，之后继续复用现有 chunking、artifact linking、raw archive、search/context pack 链路。
 
 ## Acceptance Criteria (evolving)
 
 * [x] 现状已核清：当前 image block 做了什么、缺什么、已有预留点是什么。
-* [ ] 方案明确：pre-ingest 阶段如何生成视觉理解旁车数据，MCP ingest 如何消费。
+* [x] 方案明确：pre-ingest 阶段如何生成视觉理解旁车数据，MCP ingest 如何消费。
 * [ ] MVP 字段明确：image 对象至少包含哪些视觉语义字段。
 * [ ] 失败策略明确：无多模态能力、图片不可读、格式不支持时如何降级和记录。
 
@@ -47,6 +50,49 @@
 * 不在本 task 中引入独立视觉模型服务。
 * 不要求用户配置额外视觉模型 API key。
 * 不把远程图片下载策略扩大到新的爬取范围。
+
+## Technical Approach
+
+目标闭环：
+
+```text
+用户调用 pkcs-ingest skill
+  -> agent 运行 uv run pkcs prepare-ingest <source>
+  -> Docling/Markdown normalizer 生成标准 package
+       document.md
+       assets/
+       tables/
+       source-info.json
+       ingest-log.json
+  -> agent 自己或派发子代理读取 assets/ 中的本地图片
+  -> agent 生成 image-enrichment.json
+  -> agent 调用 MCP ingest_source(path=document.md)
+  -> Markdown block graph 识别 image block
+  -> image artifact 创建时按图片路径 / block metadata 消费 image-enrichment.json
+  -> 后续 chunking、artifact summary、artifact linking、raw archive、search/context pack 继续走现有链路
+```
+
+建议 package 形态：
+
+```text
+data/private/ingest-prep/YYYY-MM-DD-source-slug/
+  document.md
+  assets/
+  tables/
+  source-info.json
+  ingest-log.json
+  image-enrichment.json
+```
+
+`image-enrichment.json` 由 agent 生成，PKCS 只校验和消费。MVP 先以 normalized asset path 作为主匹配键，例如 `assets/diagram.png`；远程图片默认不做视觉理解，只保留已有 URI、alt/caption/nearby metadata。
+
+## Decision (ADR-lite)
+
+**Context**: PKCS 已能识别 Markdown 图片 block 并持久化 image artifact，但视觉语义字段没有生成来源。用户希望复用 agent CLI 的多模态能力，而不是让普通用户额外接入视觉模型 API 或部署本地服务。
+
+**Decision**: 采用 agent-generated sidecar 方案。`pkcs-ingest` skill 编排完整链路：先用 `prepare-ingest` 生成标准 package，再由 agent/子代理分析本地图片并写入 `image-enrichment.json`，最后调用 MCP `ingest_source`。MCP ingest 保持确定性，只消费旁车数据。
+
+**Consequences**: 方案对 Codex / Claude Code / OpenCode 更友好，避免把视觉模型依赖塞进 MCP server。代价是实现时需要定义稳定的旁车 schema、匹配规则和降级日志，并更新 skill 教会 agent 生成该文件。
 
 ## Technical Notes
 
