@@ -71,6 +71,39 @@ PKCS 的推荐使用方式是接入 Codex CLI、Claude Code 等 agent CLI，让 
 
 对于 PDF、DOCX、XLSX、HTML 等非 Markdown 输入，由 agent 调用 `pkcs-ingest` skill 完成规范化，再通过 MCP `ingest_source` 摄入生成的 `document.md`。
 
+## 常用 CLI 示例
+
+摄入一份 Markdown 或 text 文档：
+
+```bash
+uv run pkcs ingest path/to/document.md --knowledge-type document --canonical-key document:example
+```
+
+搜索已摄入资料：
+
+```bash
+uv run pkcs search "your search query" --knowledge-type document --canonical-key document:example --top-k 5
+```
+
+按搜索结果中的 `chunk_id` 读回原文证据：
+
+```bash
+uv run pkcs read --chunk-id "<chunk_id_from_search>" --context-lines 2
+```
+
+生成 Context Pack：
+
+```bash
+uv run pkcs context-pack "your research question" --knowledge-type document --canonical-key document:example --top-k 8 --budget-tokens 1200
+```
+
+如果输入是 PDF、DOCX、XLSX 或 HTML，先生成 ingest package，再摄入生成的 `document.md`：
+
+```bash
+uv run pkcs prepare-ingest path/to/source.pdf --slug example
+uv run pkcs ingest data/private/ingest-prep/<generated-package>/document.md --knowledge-type document --canonical-key document:example
+```
+
 ## HTTP 服务
 
 启动本地 HTTP 服务：
