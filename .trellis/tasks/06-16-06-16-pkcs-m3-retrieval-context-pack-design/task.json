@@ -1,0 +1,62 @@
+{
+  "id": "06-16-pkcs-m3-retrieval-context-pack-design",
+  "name": "06-16-pkcs-m3-retrieval-context-pack-design",
+  "title": "brainstorm: PKCS M3 retrieval and Context Pack design",
+  "description": "",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-16",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 1,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/tasks/06-16-06-16-pkcs-m3-retrieval-context-pack-design/prd.md",
+    ".trellis/tasks/06-03-pkcs-project-plan/prd.md",
+    "src/pkcs/search/",
+    "src/pkcs/context_pack/",
+    "tests/test_acceptance.py",
+    "tests/test_context_pack.py"
+  ],
+  "notes": "M3 design brainstorm started. Initial recommendation is baseline-first: expand retrieval/Context Pack eval, then QueryRouter/RetrievalPlan, lexical fusion, Context Pack v1, and only then semantic/rerank spike.",
+  "meta": {
+    "recommended_approach": "baseline-first"
+  }
+}
