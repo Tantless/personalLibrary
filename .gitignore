@@ -10,3 +10,4 @@ data/private/
 data/**/*.tmp
 
 .codex/config.toml
+data/
