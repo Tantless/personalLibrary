@@ -1,0 +1,8 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": "src/pkcs/storage/raw_archive.py", "reason": "Raw asset destination naming is the direct fix point"}
+{"file": "src/pkcs/ingest/service.py", "reason": "Ingest service calls raw archive writer and persists image asset paths"}
+{"file": "src/pkcs/ingest/parsers.py", "reason": "Parser assigns image artifact keys but should not force raw filenames"}
+{"file": "tests/test_ingest_normalization.py", "reason": "Prepared package ingest regression should assert raw Markdown links resolve"}
+{"file": "tests/test_ingest.py", "reason": "Image asset ingest tests need updated expectations"}
+{"file": "tests/test_raw_archive.py", "reason": "RawArchiveWriter contract tests should cover safe relative asset paths"}
