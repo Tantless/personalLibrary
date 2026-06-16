@@ -54,16 +54,17 @@
     ".trellis/tasks/06-03-pkcs-mvp-m1-m2/prd.md",
     ".trellis/tasks/06-03-pkcs-mvp-m1-m2/codex-cli-mcp-acceptance.md"
   ],
-  "notes": "Overall PKCS planning remains active for M3-M5. M1+M2 MVP is complete locally and the database modeling cleanup child task is complete. The next concrete validation step is real Codex CLI MCP acceptance before expanding M3 scope.",
+  "notes": "Overall PKCS planning remains active. M1+M2 MVP and follow-up ingest/artifact improvements are complete. M3-M5 roadmap was refreshed on 2026-06-16 from the current implementation baseline; recommended next concrete task is M3 retrieval and Context Pack quality baseline.",
   "meta": {
     "completed_scope": [
       "M1+M2 local MVP with ingest/search/read_source/context_pack via CLI, HTTP health, and MCP tools.",
       "Database modeling cleanup for source format, normalized format, knowledge type, int enum fields, Raw Archive identity, and generated canonical keys."
     ],
     "future_scope": [
-      "M3 retrieval orchestration and Context Pack quality improvements.",
-      "Semantic retrieval, reranking, and additional knowledge type strategy.",
-      "Additional ingest sources such as PDF, docx, email, URL crawling, and code repositories."
-    ]
+      "M3 starts with retrieval and Context Pack eval baseline, then query router, lexical fusion, Context Pack v1, and optional semantic/rerank spike.",
+      "M4 adds source-specific profiles in order: AI conversation memory, official docs, code repository, entity/wiki, then email/work knowledge.",
+      "M5 adds personal eval gates, backup/restore, permissions/audit, reviewed wiki/memory condensation, and resource controls."
+    ],
+    "recommended_next_task": "brainstorm: PKCS M3 retrieval and Context Pack quality baseline"
   }
 }

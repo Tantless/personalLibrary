@@ -13,7 +13,7 @@
 * 外部使用者包括 Claude Code、Codex、OpenClaw、IDE Agent、本地 Agent、自动化脚本和未来自定义工作流。
 * 总路线被设计为五个阶段：M1 接入骨架与数据底座，M2 摄入与基础检索 MVP，M3 检索编排与 Context Pack，M4 特色知识源增强，M5 知识沉淀、安全、评测与运维。
 * 原设计已经给出 MVP 建议范围：MCP / HTTP 接入、Raw Archive、PostgreSQL metadata、基础搜索、read_source、get_context_pack v0、AI 对话 ingest、Markdown / 网页 ingest、GitHub repo ingest v0。
-* 当前仓库尚无实现代码，只有 `AGENTS.md`、`.trellis/` 和 `personal_knowledge_context_server_design.md`。
+* 当前仓库已完成 M1+M2 MVP，并在后续任务中扩展了 Markdown block graph、table/image artifact、Docling-backed prepare-ingest、image enrichment sidecar、raw archive image link 保真等能力。
 
 ## Assumptions (Temporary)
 
@@ -24,7 +24,7 @@
 
 ## Open Questions
 
-* No open MVP questions. M3-M5 PRDs remain future planning work after MVP confirmation.
+* M3 第一刀建议先做检索/Context Pack 质量基线与评测扩展；用户可确认是否按该顺序创建 M3A 实施任务。
 
 ## Requirements (Evolving)
 
@@ -81,11 +81,13 @@
 * MVP evaluation corpus 放在 `tests/fixtures/`，只使用合成或非私密样例。
 * MVP 检索评测问题使用 `tests/fixtures/eval_queries.jsonl`，每行一个 query expectation。
 * MVP PRD 已于 2026-06-04 经用户确认完成，可进入 Trellis Phase 2 准备。
+* 截至 2026-06-16，M1+M2 已完成并扩展了 Markdown block graph、table/image artifact、Docling-backed prepare-ingest、image enrichment sidecar、raw archive image link 保真等能力。
+* M3-M5 规划应基于当前已实现能力继续推进，而不是回到最初设计里的空仓库假设。
 
 ## Acceptance Criteria (Evolving)
 
 * [x] 项目级目标、边界、阶段路线被整理成可执行 PRD。
-* [ ] M1 到 M5 每个阶段都有目标、范围、产物、验收标准和完成定义。
+* [x] M1 到 M5 每个阶段都有目标、范围、产物、验收标准和完成定义。
 * [x] MVP 范围明确列出必须做与明确不做。
 * [x] 技术路线关键决策记录为 ADR-lite。
 * [x] 后续实施计划被拆成小 PR / 小任务顺序。
@@ -119,7 +121,7 @@
 * Source design document: `personal_knowledge_context_server_design.md`
 * Task directory: `.trellis/tasks/06-03-pkcs-project-plan`
 * Temporary planning context target: `AGENTS.md`
-* Current repo implementation state: no application source code found via `rg --files`; planning starts from design document.
+* Current repo implementation state as of 2026-06-16: M1+M2 MVP is implemented with CLI/HTTP/MCP, PostgreSQL metadata, Raw Archive, FTS search, read_source, Context Pack v0, Markdown block graph, table/image artifacts, Docling-backed prepare-ingest, image enrichment sidecar consumption, and raw archive image-link preservation.
 * MCP official docs describe servers as exposing tools, resources, and prompts. PKCS should begin with model-callable tools and later consider resources for browseable source/context access: https://modelcontextprotocol.io/docs/learn/server-concepts
 * MCP Streamable HTTP supports independent server processes and multiple client connections, but requires Origin validation, localhost binding for local servers, and authentication for connections: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports
 * MCP tool outputs can include structured content and optional output schemas. PKCS tools should use stable JSON schemas and may also return Markdown text for model readability: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
@@ -208,6 +210,179 @@ Recommended direction if a framework is introduced:
 * Keep PostgreSQL FTS as the selected MVP search backend.
 * Do not use LlamaIndex's default vector-first quickstart as the core architecture.
 * Add a spike/PR to evaluate LlamaIndex integration against PKCS data model before committing broadly.
+
+### M3-M5 Planning Refresh (2026-06-16)
+
+Additional current research and implementation constraints:
+
+* LlamaIndex frames a query engine as a natural-language interface over one or more indexes via retrievers, with composition as the path to more advanced behavior: https://developers.llamaindex.ai/python/framework/module_guides/deploying/query_engine/
+* Haystack models retrieval/ranking as explicit query pipeline components; its ranker docs place reranking after an initial retriever and recommend keeping retriever `top_k` bounded for speed: https://docs.haystack.deepset.ai/docs/sentencetransformerssimilarityranker
+* MCP Resources are application-driven context objects identified by URI, useful later for browseable source/context access; they should not replace PKCS tools for active search/read/context-pack workflows: https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+* pgvector can add vector similarity inside PostgreSQL, but it should remain optional until lexical/context-pack quality has a measurable baseline: https://github.com/pgvector/pgvector
+* Current PKCS already has `SearchProvider`, stable search result shape, `ContextPackService`, artifact hydration, and evaluation fixtures. M3 should extend these seams before adding a heavier framework.
+
+## M3-M5 Roadmap From Current Baseline
+
+### M3: 检索编排与 Context Pack v1
+
+Goal:
+
+* 把当前“FTS top_k + 简单 evidence cap”的 Context Pack v0，升级为可解释、可评测、能针对不同问题选择检索路径的 Context Pack v1。
+
+Scope:
+
+* 扩展检索评测，不先扩展资料类型。
+* 保持现有 MCP tool 名称稳定，必要时只在返回 JSON 中增加向后兼容字段。
+* 在当前 PostgreSQL FTS 基础上先做 query planning、multi-pass lexical retrieval、fusion、source trust/freshness/caveats。
+* 仅在有基线后，再以 feature-flag/spike 方式评估 pgvector / reranker。
+
+Small PR sequence:
+
+1. **M3A Retrieval and Context Pack eval baseline**
+   * 扩展 `eval_queries.jsonl` schema，增加 `query_type`、`expected_evidence`、`must_not_sources`、`support_required`。
+   * 新增 Context Pack 质量测试：evidence 是否支持 query、是否保留 source/version/locator、是否避免错误 source type。
+   * 记录当前 FTS baseline，作为后续 router/fusion/rerank 的比较基准。
+2. **M3B RetrievalPlan / QueryRouter v1**
+   * 新增内部 `RetrievalPlan` dataclass，不急着暴露新 MCP tool。
+   * 基于 query 文本、显式 filter、knowledge_type、canonical_key、关键词特征生成计划。
+   * 先支持 `exact_lookup`、`project_memory`、`official_doc_lookup`、`ai_conversation_lookup`、`artifact_lookup` 等少量 intent。
+3. **M3C Multi-pass lexical retrieval + fusion**
+   * 同一 query 生成多个 FTS 子查询：原始问题、关键短语、标题/heading 候选、artifact text 候选。
+   * 用稳定、可解释的 fusion 规则合并候选，避免单一 source 或相邻 chunk 刷屏。
+   * Search result metadata 记录 retrieval pass 和 fusion reason。
+4. **M3D Context Pack v1 selection and rendering**
+   * Evidence selection 引入 source diversity、source trust、freshness caveat、artifact hydration budget。
+   * Context Pack 增加 `High-Level Answer Hints`，但不替主 Agent 生成最终答案。
+   * `Conflicts / Caveats` 从固定模板升级为基于 source type、时间、资料可信度和 evidence coverage 的规则生成。
+5. **M3E Semantic/rerank spike**
+   * 在 M3A-D 基线之后评估 pgvector embedding 或 bounded reranker。
+   * 只作为 adapter/feature flag，不让 embedding/reranker 接管 source identity、citation、Raw Archive 或 read_source。
+   * 以 eval delta 决定是否进入正式依赖。
+
+Deliverables:
+
+* `RetrievalPlan` internal model and tests.
+* Expanded eval fixtures and quality report.
+* Fusion-capable search orchestration.
+* Context Pack v1 JSON/Markdown output with better selection, caveats, and follow-up reads.
+
+Acceptance Criteria:
+
+* 至少 50 条非私密 eval queries，覆盖 document、ai_conversation、artifact、official doc/project memory 类场景。
+* top 5 hit rate 不低于当前 baseline，目标达到 80%+。
+* top 10 hit rate 不低于当前 baseline，目标达到 90%+。
+* Context Pack 中 100% evidence 都有 `source_id`、`version_id`、`chunk_id` 或 locator。
+* 抽样 Context Pack 中至少 80% 的关键 evidence 能支持 query。
+* 不把 AI conversation 猜测当成官方文档事实；此类情况必须进入 Caveats 或被降权。
+
+Definition of Done:
+
+* M3A-D 测试和 `uv run pytest` 通过。
+* README 或任务报告记录如何运行 M3 eval。
+* 若引入 pgvector/reranker spike，必须记录依赖、资源成本、baseline delta 和 rollback 方案。
+
+### M4: 特色知识源增强
+
+Goal:
+
+* 让 PKCS 对不同知识类型使用不同结构和检索路径，而不是把所有资料都当普通 Markdown chunk。
+
+Recommended order:
+
+1. **M4A AI conversation memory enrichment** (Recommended first)
+   * 因为 `ai_conversation` 已是当前支持类型，改动风险最低。
+   * 增加 conversation summary、decision records、open questions、belief changes、project links 等 derived memory artifacts。
+   * 支持 `search_memory` / `get_decisions` 可以先作为内部 service 或 CLI/MCP experimental tool 讨论后再暴露。
+2. **M4B Official technical docs profile**
+   * 在 document 上增加 provider/product/api/version/deprecated/freshness metadata。
+   * Context Pack 对官方文档设置更高 trust，并对过期资料输出 caveat。
+3. **M4C Code repository ingest v0**
+   * 单独建 code source model，不继承普通 document chunk 语义。
+   * 必须保留 repo、branch/commit、file_path、symbol、line_range。
+   * 再讨论 `search_code`、`read_code`、`find_symbol`。
+4. **M4D Entity/wiki profiles for game/anime/reference materials**
+   * 增加 entity、alias、work、relation、category 等结构。
+   * 适合在 M3 router/fusion 稳定后做 entity expansion search。
+5. **M4E Email/work knowledge**
+   * 放在较后，因为涉及隐私、权限、thread/attachment、日期和参与者模型。
+
+Deliverables:
+
+* 每个新 source profile 都有 parser/enrichment contract、metadata contract、retrieval behavior、Context Pack behavior、trace/debug output 和 eval cases。
+* 新 knowledge type 只有在 schema、filter、Context Pack 和 tests 都准备好时才加入 `SUPPORTED_KNOWLEDGE_TYPE_CODES`。
+
+Acceptance Criteria:
+
+* 每个 M4 子模块至少 20 条专项 eval queries。
+* 每个新增 profile 都能 search -> read_source -> context_pack 闭环。
+* Code/email/entity 等专项资料不破坏现有 document / ai_conversation 行为。
+* 所有新增 evidence 仍可追溯到 Raw Archive locator 或等价的可读回定位。
+
+Definition of Done:
+
+* 每个 source profile 独立 PRD 和验收报告。
+* 新增 schema 有 migration、中文列注释、枚举 int mapping 和回归测试。
+* 资料类型扩展不引入默认公网抓取或未审计写入。
+
+### M5: 知识沉淀、安全、评测与运维
+
+Goal:
+
+* 把 PKCS 从“可用检索服务”升级为长期可靠、可回归、可备份、可防污染的个人知识基础设施。
+
+Recommended order:
+
+1. **M5A Personal eval harness and quality gates**
+   * 扩展到 100+ 条个人知识检索/Context Pack 回归 query。
+   * 记录 baseline、delta、失败样例和质量门槛。
+2. **M5B Backup / restore / migration drills**
+   * 明确 PostgreSQL、Raw Archive、ingest-prep package、配置文件的备份和恢复边界。
+   * 提供 restore smoke test，证明新环境可读回旧 evidence。
+3. **M5C Security, permissions, audit**
+   * 默认读写工具分权。
+   * 写入长期记忆需要显式权限或 proposal/review 流程。
+   * 增加 audit log / operation log，避免无法追踪错误写入。
+4. **M5D Knowledge condensation / LLM Wiki layer**
+   * 在检索和 Context Pack 稳定后，沉淀 project pages、decision records、concept pages、contradiction logs。
+   * 第一版应是 proposal + citation + human review，不是 autonomous write。
+5. **M5E Resource and operations controls**
+   * 控制 embedding/reranker worker、batch ingest、日志、索引大小和后台任务。
+
+Deliverables:
+
+* Eval dashboard/report or CLI output.
+* Backup/restore commands or documented runbook with executable smoke test.
+* Permission/audit model.
+* Reviewed Markdown wiki/memory layer with source citations.
+
+Acceptance Criteria:
+
+* 至少 100 条回归 queries 可一键运行。
+* 每次检索策略修改都能比较 baseline delta。
+* 任意 Context Pack 关键结论都能追溯到 source/version/locator。
+* 错误写入可以定位、撤销或覆盖为新版本。
+* 从备份恢复后，search/read_source/context_pack 基础闭环可用。
+
+Definition of Done:
+
+* 安全/运维能力有自动化 smoke test 或明确人工验收文档。
+* 长期记忆写入默认不是无审核自动写入。
+* 文档明确本地、服务器、私密资料路径和备份边界。
+
+## Recommended Next Concrete Task
+
+建议下一步创建并实施：
+
+```text
+brainstorm: PKCS M3 retrieval and Context Pack quality baseline
+```
+
+Reason:
+
+* 它不会急着引入 heavy dependency。
+* 它给后续 router/fusion/reranker 提供可比较的质量基线。
+* 它直接验证 PKCS 的核心价值：主 Agent 能不能拿到更有用、更可追溯的 Context Pack。
+* 它能复用当前已完成的 FTS、artifact hydration、read_source、eval fixtures 和 real-doc MCP acceptance 经验。
 
 ## Initial Project Structure Proposal
 
