@@ -422,13 +422,15 @@ class IngestService:
             candidate = source_path.parent / candidate
         if not candidate.exists() or not candidate.is_file():
             return None
-        return self.raw_archive_writer.write_asset(
+        archived_path = self.raw_archive_writer.write_asset(
             knowledge_type=knowledge_type,
             source_id=source_id,
             version_id=version_id,
             artifact_key=artifact_key,
             original_path=candidate,
-        ).as_posix()
+            relative_path=original_uri,
+        )
+        return archived_path.as_posix() if archived_path is not None else None
 
     def _load_image_enrichment(self, *, path: Path, knowledge_type: str) -> ImageEnrichmentSidecar:
         if knowledge_type != KNOWLEDGE_TYPE_NAME_DOCUMENT:

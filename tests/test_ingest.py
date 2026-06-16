@@ -95,6 +95,7 @@ def test_ingest_markdown_table_and_image_artifacts(db_session, tmp_path) -> None
     assert report.status == "completed"
     table = db_session.scalars(select(TableArtifact).where(TableArtifact.version_id == report.version_id)).one()
     image = db_session.scalars(select(ImageArtifact).where(ImageArtifact.version_id == report.version_id)).one()
+    version = db_session.get(SourceVersion, report.version_id)
     chunks = db_session.scalars(select(Chunk).where(Chunk.version_id == report.version_id)).all()
     narrative = next(chunk for chunk in chunks if chunk.metadata_json["chunk_kind"] == "narrative")
     table_rows = next(chunk for chunk in chunks if chunk.metadata_json.get("chunk_kind") == "table_rows")
@@ -112,6 +113,8 @@ def test_ingest_markdown_table_and_image_artifacts(db_session, tmp_path) -> None
     assert image.alt_text == "RAG architecture"
     assert image.asset_path is not None
     assert Path(image.asset_path).read_bytes() == b"fake-png"
+    assert version is not None
+    assert Path(image.asset_path) == Path(version.raw_archive_path).parent / "images" / "rag.png"
 
     linked = narrative.metadata_json["linked_artifacts"]
     assert {item["artifact_type"] for item in linked} == {"table", "image"}

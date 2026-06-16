@@ -123,6 +123,14 @@ Core tables:
 - `table_artifacts`: Markdown-only table objects; stores `artifact_key`, locator fields, `heading_path`, `columns`, `rows`, `normalized_markdown`, optional `summary`, and metadata. `(version_id, artifact_key)` is unique.
 - `image_artifacts`: Markdown-only image objects; stores `artifact_key`, locator fields, `heading_path`, `original_uri`, optional Raw Archive `asset_path`, `alt_text`, `caption`, `nearby_text`, future `ocr_text`, future `vision_summary`, and metadata. `(version_id, artifact_key)` is unique.
 
+Raw Archive local image assets:
+
+- For local Markdown image references, `image_artifacts.original_uri` is the Markdown URI and `image_artifacts.asset_path` is the copied Raw Archive file path.
+- If `original_uri` is a safe relative path such as `assets/diagram.png` or `images/rag.png`, archive the asset at the same relative path under the source version directory so archived `document.md` links remain directly resolvable.
+- Do not prefix Raw Archive asset filenames with artifact keys such as `img_001-`; `artifact_key` belongs in database rows and chunk metadata, not in evidence file names.
+- Unsafe local image URIs (`..` segments, absolute paths, Windows drive paths, or paths that would escape the source version directory) must not be copied outside the Raw Archive version directory.
+- Remote, `data:`, and `mailto:` image URIs keep `asset_path=None`.
+
 Source identity:
 
 - Treat user-provided ingest paths as one-time input locations only.
@@ -231,6 +239,9 @@ Pytest database isolation:
 | Duplicate ingest for same canonical source and content hash | Application skips new version creation | Ingest tests assert the existing version id is returned |
 | Changed content for same canonical source | Application creates a new source version and preserves old version | Ingest tests assert two versions for one source |
 | Optional search filters are omitted | Query still executes without PostgreSQL ambiguous parameter errors | Search tests call without filters |
+| Prepared Markdown image `assets/diagram.png` is ingested | Raw Archive stores `assets/diagram.png`; archived `document.md` image link resolves from its own directory | Ingest normalization regression test checks every raw Markdown image link exists |
+| Ordinary Markdown image `images/rag.png` is ingested | Raw Archive stores `images/rag.png`; image artifact still uses `artifact_key="img_001"` only in metadata/DB | Ingest artifact test asserts `image.asset_path` matches raw document parent plus `images/rag.png` |
+| Unsafe local image path attempts to escape Raw Archive version directory | Asset is not written outside the version directory | Raw Archive writer test rejects `../`, absolute, and Windows drive paths |
 | Title and body both match | Title match sorts ahead when scores are otherwise close | `test_search_top_k_and_title_boost` |
 | Read by `chunk_id` | Returns source/version refs and fragment content for that chunk locator | Reader tests map search result chunk id back to source |
 | Read by source/version/locator | Returns the requested line range plus optional context | Reader tests use `line 4-4` with `context_lines=1` |
@@ -290,6 +301,7 @@ PKCS_TEST_DATABASE_URL=postgresql+psycopg://pkcs:pkcs@localhost:54329/pkcs
 - `tests/test_database_schema.py`: foreign key column comments must include the referenced table and column.
 - `tests/test_repositories.py`: repository write/read behavior, including table/image artifact repositories, and caller-owned commit.
 - `tests/test_raw_archive.py`: raw archive path layout that `source_versions.raw_archive_path` stores.
+- `tests/test_raw_archive.py`: local image asset path safety and preservation of safe relative paths.
 - `tests/test_ingest.py`: duplicate hash skip, new hash versioning, chunks/citations, generated canonical keys, Raw Archive read-back after input deletion, Markdown table/image artifacts, asset copying, image enrichment sidecar success/failure degradation, and ingest job summaries.
 - `tests/test_search.py`: PostgreSQL FTS query, title boost, filters, top_k, no-results, artifact-derived chunk retrieval, and interface smoke tests.
 - `tests/test_reader.py`: `chunk_id`, source/version/locator, `context_lines`, invalid locator, CLI, and MCP.
@@ -405,5 +417,6 @@ Pytest owns this disposable database and may drop/recreate it at session startup
 - Reading current source files instead of Raw Archive in `read_source`; this breaks version traceability.
 - Building Context Pack evidence directly from snippets only; snippets are not enough for read-back traceability.
 - Treating Markdown artifact placeholders as durable links. They are display text; `metadata_json.artifact_id` is the durable link.
+- Prefixing Raw Archive image filenames with `img_001-` or another artifact key. This breaks archived Markdown links because the source document still references the original relative URI.
 - Running pytest against the development database. Temporary Raw Archive paths and synthetic fixtures belong only in the disposable `_test` database.
 - Treating image enrichment as a hard ingest dependency. Missing or invalid `image-enrichment.json` must degrade to ordinary image artifact ingest.

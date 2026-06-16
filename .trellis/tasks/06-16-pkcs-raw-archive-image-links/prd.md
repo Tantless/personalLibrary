@@ -78,13 +78,13 @@
 
 ## Acceptance Criteria
 
-* [ ] 新增回归测试：prepared package 摄入后，raw `document.md` 中所有 Markdown 图片链接都能从 raw `document.md` 所在目录解析到存在的文件。
-* [ ] 新增或更新测试：`image_artifacts.asset_path` 指向 raw 中真实存在的图片文件。
-* [ ] 新增路径安全测试：`../evil.png`、绝对路径、Windows drive path 等不允许写出 raw version 目录。
-* [ ] prepared Markdown package ingest 仍能生成 image artifact，并保留 image enrichment 匹配能力。
-* [ ] 普通 Markdown local image ingest 仍能复制 asset，并使 raw Markdown 链接有效。
-* [ ] 远程图片 URL 行为不变：不复制 asset，`asset_path` 为 `None`。
-* [ ] `uv run pytest` 通过，至少覆盖 ingest、normalization、raw archive 相关测试。
+* [x] 新增回归测试：prepared package 摄入后，raw `document.md` 中所有 Markdown 图片链接都能从 raw `document.md` 所在目录解析到存在的文件。
+* [x] 新增或更新测试：`image_artifacts.asset_path` 指向 raw 中真实存在的图片文件。
+* [x] 新增路径安全测试：`../evil.png`、绝对路径、Windows drive path 等不允许写出 raw version 目录。
+* [x] prepared Markdown package ingest 仍能生成 image artifact，并保留 image enrichment 匹配能力。
+* [x] 普通 Markdown local image ingest 仍能复制 asset，并使 raw Markdown 链接有效。
+* [x] 远程图片 URL 行为不变：不复制 asset，`asset_path` 为 `None`。
+* [x] `uv run pytest` 通过，至少覆盖 ingest、normalization、raw archive 相关测试。
 
 ## Definition of Done
 

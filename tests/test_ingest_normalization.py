@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 from contextlib import nullcontext
 from pathlib import Path
@@ -9,11 +10,13 @@ from typer.testing import CliRunner
 
 from pkcs.cli import app as cli_app
 from pkcs.config import get_settings
-from pkcs.db.models import ImageArtifact
+from pkcs.db.models import ImageArtifact, SourceVersion
 from pkcs.ingest import IngestService, PrepareIngestService
 from pkcs.ingest.normalization import _find_docling_executable
 from pkcs.mcp.server import create_mcp_server
 from pkcs.storage.raw_archive import RawArchiveWriter
+
+_MARKDOWN_IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 
 
 def make_ingest_service(db_session, raw_root: Path) -> IngestService:
@@ -23,6 +26,10 @@ def make_ingest_service(db_session, raw_root: Path) -> IngestService:
         chunk_max_chars=1000,
         chunk_overlap_lines=1,
     )
+
+
+def markdown_image_links(document_path: Path) -> list[str]:
+    return _MARKDOWN_IMAGE_LINK_RE.findall(document_path.read_text(encoding="utf-8"))
 
 
 def test_prepare_ingest_markdown_package_normalizes_local_assets(tmp_path) -> None:
@@ -300,11 +307,18 @@ def test_prepared_markdown_package_can_be_ingested(db_session, tmp_path) -> None
     )
 
     image = db_session.scalars(select(ImageArtifact).where(ImageArtifact.version_id == ingest_report.version_id)).one()
+    version = db_session.get(SourceVersion, ingest_report.version_id)
+    assert version is not None
+    raw_document_path = Path(version.raw_archive_path)
+    raw_image_links = markdown_image_links(raw_document_path)
+
     assert prepare_report.status == "success"
     assert ingest_report.status == "completed"
     assert image.original_uri == "assets/diagram.png"
     assert image.asset_path is not None
     assert Path(image.asset_path).read_bytes() == b"diagram"
+    assert raw_image_links == ["assets/diagram.png"]
+    assert [(raw_document_path.parent / link).exists() for link in raw_image_links] == [True]
 
 
 async def test_prepared_markdown_package_can_be_ingested_through_mcp(
