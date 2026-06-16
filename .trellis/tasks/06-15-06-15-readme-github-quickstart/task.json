@@ -3,8 +3,8 @@
   "name": "06-15-readme-github-quickstart",
   "title": "brainstorm: simplify README for GitHub quickstart",
   "description": "",
-  "status": "planning",
-  "dev_type": null,
+  "status": "in_progress",
+  "dev_type": "docs",
   "scope": null,
   "package": null,
   "priority": "P2",
@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 3,
   "next_action": [
     {
       "phase": 1,
@@ -42,12 +42,17 @@
       "action": "record-session"
     }
   ],
-  "commit": null,
+  "commit": "0556995",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
-  "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "relatedFiles": [
+    "README.md",
+    ".trellis/tasks/06-15-06-15-readme-github-quickstart/prd.md"
+  ],
+  "notes": "README was simplified in 0556995. Startup guidance and removal of internal PR narration are complete; minimal CLI examples for ingest/search/read/context-pack are still missing.",
+  "meta": {
+    "state_sync": "2026-06-16: marked partial completion from committed README changes; kept task open for missing CLI examples."
+  }
 }

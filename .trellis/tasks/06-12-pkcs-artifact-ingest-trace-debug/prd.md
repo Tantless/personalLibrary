@@ -31,13 +31,13 @@
 
 ## Acceptance Criteria
 
-* [ ] 可以运行 `uv run pkcs trace-ingest <markdown-file> --knowledge-type document --canonical-key <key>` 并输出 JSON。
-* [ ] JSON 中能看到 input -> parser -> storage checks -> ingest report -> database -> design gaps。
-* [ ] trace 中 table/image artifacts 数量与数据库 rows 一致。
-* [ ] trace 中 narrative chunk 能看到 `linked_artifacts`，且落库后有 `artifact_id`。
-* [ ] trace 中 derived chunks 能看到 `chunk_kind`、`artifact_type`、`artifact_id`、`parent_narrative_chunk_id`。
-* [ ] 测试使用 synthetic fixture，不依赖 private data。
-* [ ] `uv run pytest` 通过。
+* [x] 可以运行 `uv run pkcs trace-ingest <markdown-file> --knowledge-type document --canonical-key <key>` 并输出 JSON。
+* [x] JSON 中能看到 input -> parser -> storage checks -> ingest report -> database -> design gaps。
+* [x] trace 中 table/image artifacts 数量与数据库 rows 一致。
+* [x] trace 中 narrative chunk 能看到 `linked_artifacts`，且落库后有 `artifact_id`。
+* [x] trace 中 derived chunks 能看到 `chunk_kind`、`artifact_type`、`artifact_id`、`parent_narrative_chunk_id`。
+* [x] 测试使用 synthetic fixture，不依赖 private data。
+* [x] `uv run pytest` 通过。
 
 ## Technical Approach
 
@@ -81,4 +81,3 @@
 * DB models/repositories: `src/pkcs/db/models.py`, `src/pkcs/db/repositories.py`
 * CLI: `src/pkcs/cli.py`
 * Existing tests: `tests/test_ingest.py`, `tests/test_context_pack.py`, `tests/test_search.py`
-

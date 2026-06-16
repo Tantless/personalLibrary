@@ -24,9 +24,9 @@
 
 ## Acceptance Criteria
 
-* [ ] README 能指导新用户完成安装依赖、启动 PostgreSQL、迁移数据库和运行健康检查。
+* [x] README 能指导新用户完成安装依赖、启动 PostgreSQL、迁移数据库和运行健康检查。
 * [ ] README 包含摄入、搜索、读取证据、Context Pack 的最小 CLI 示例。
-* [ ] README 不再包含 PR1/PR2 等内部项目进度叙述。
+* [x] README 不再包含 PR1/PR2 等内部项目进度叙述。
 
 ## Definition of Done
 
