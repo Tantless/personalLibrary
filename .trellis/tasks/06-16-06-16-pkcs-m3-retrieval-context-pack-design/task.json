@@ -55,10 +55,11 @@
     "tests/test_acceptance.py",
     "tests/test_context_pack.py"
   ],
-  "notes": "M3 design brainstorm started. User confirmed baseline-first on 2026-06-17. Baseline design now separates deterministic MVP regression, no-marker M3 eval, search quality metrics, Context Pack quality metrics, and JSON baseline reporting.",
+  "notes": "M3 design brainstorm started. User confirmed baseline-first on 2026-06-17 and pointed out baseline requires a real corpus. Plan updated to add M3A0 corpus bootstrap before M3A1 baseline metrics.",
   "meta": {
     "recommended_approach": "baseline-first",
     "confirmed_approach": "baseline-first",
-    "confirmed_at": "2026-06-17"
+    "confirmed_at": "2026-06-17",
+    "baseline_corpus_decision": "pending"
   }
 }

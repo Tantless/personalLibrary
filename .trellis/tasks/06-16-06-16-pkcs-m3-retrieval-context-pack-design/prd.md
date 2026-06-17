@@ -14,6 +14,9 @@
 * 当前 Context Pack v0 的 caveats 是固定模板，未做真正 source trust、freshness、conflict/caveat 推断。
 * 当前测试覆盖 Context Pack shape、evidence cap、soft budget、artifact hydration、CLI/MCP smoke；acceptance eval 主要验证 top 5/top 10 检索阈值。
 * 项目约束：不要让 LangChain/LlamaIndex/Haystack/pgvector/reranker 接管核心 source/version/chunk/citation/Raw Archive/read_source 模型。
+* 用户指出：baseline 必须针对一批材料；当前项目还没有一批可作为 M3 baseline 的稳定材料。
+* 现有 `tests/fixtures/` 只有 10 个小 Markdown/text 和 10 个小 conversation fixture，适合 MVP smoke，不足以代表 M3 检索质量。
+* `data/private/acceptance-inputs/` 和 `data/private/ingest-prep/` 中已有若干真实/半真实验收材料，但它们是 gitignored private data，尚未整理成稳定 corpus manifest。
 
 ## Assumptions (temporary)
 
@@ -24,7 +27,7 @@
 
 ## Open Questions
 
-* M3A baseline 语料范围：只用合成 fixture，还是同时加入 gitignored private acceptance corpus 的人工运行报告？
+* M3A baseline corpus 采用哪种来源组合：只做可提交 synthetic/curated corpus，还是同时维护 gitignored private corpus manifest？
 
 ## Requirements (evolving)
 
@@ -37,6 +40,8 @@
 * M3 已确认采用 baseline-first 路线：先建立可重复质量基线，再实现 QueryRouter / lexical fusion / Context Pack v1，最后才评估 semantic/rerank。
 * M3A baseline 必须分开衡量 search quality 与 Context Pack quality；不能只用 top_k hit rate 代表上下文可用性。
 * M3A baseline 必须保留当前 MVP marker-based eval 的确定性，同时新增更接近真实问题的 no-marker eval。
+* M3A baseline 前必须先建设 corpus；没有稳定 corpus 时不实现 QueryRouter、fusion 或 reranker。
+* M3 baseline corpus 至少分成 committed CI corpus 和 optional private local corpus 两层，避免把私密资料提交到仓库。
 
 ## Acceptance Criteria (evolving)
 
@@ -152,7 +157,88 @@ Cons:
 
 ## Proposed M3 MVP Shape
 
-### M3A: Retrieval and Context Pack quality baseline
+### M3A0: Baseline corpus bootstrap
+
+Problem:
+
+* 当前没有一批真正可用的 M3 baseline 材料。
+* MVP fixtures 太短、太人工、带 anchor，能防回归但不能衡量真实检索质量。
+* private 目录有真实验收资料，但未形成 manifest、query set、expected evidence，因此不能直接作为 baseline。
+
+Corpus tiers:
+
+1. **Tier 0: MVP regression corpus**
+   * 位置：现有 `tests/fixtures/`。
+   * 作用：继续验证基础 ingest/search/read/context-pack 不坏。
+   * 特点：小、可提交、确定性强、marker/anchor query。
+   * 不作为 M3 质量判断主依据。
+2. **Tier 1: committed M3 curated corpus**
+   * 位置建议：`tests/fixtures/m3_corpus/` 与 `tests/fixtures/m3_eval_queries.jsonl`。
+   * 内容：非私密、可提交、较长、接近真实问题的材料。
+   * 建议规模：第一版 12-20 份资料，30-50 条 no-marker query。
+   * 类型覆盖：official docs 摘要/节选、项目设计笔记、AI conversation 摘要、artifact-heavy Markdown、冲突/过时示例。
+   * 原则：不使用真实私密内容；可以手写 realistic synthetic docs，也可以使用允许提交的公开资料节选，但要避免大体积和版权风险。
+3. **Tier 2: gitignored private acceptance corpus**
+   * 位置建议：`data/private/m3-baseline/manifest.json` 与 `data/private/m3-baseline/eval_queries.jsonl`。
+   * 内容：本机已有真实/半真实资料，例如官方技术文档、ML-For-Beginners Markdown、arXiv normalized package、真实 ingest-prep 输出。
+   * 作用：人工/本地质量验收，不进入 CI，不提交原文。
+   * 报告：只提交结构说明或手工验收摘要，不提交 private source content。
+
+Recommended M3A0 output:
+
+```text
+tests/fixtures/m3_corpus/
+  documents/
+  conversations/
+  artifacts/
+tests/fixtures/m3_eval_queries.jsonl
+data/private/m3-baseline/
+  manifest.json
+  eval_queries.jsonl
+  reports/
+```
+
+Tier 1 eval row draft:
+
+```json
+{
+  "query": "为什么 Context Pack 需要 caveats，而不是直接给最终答案？",
+  "query_type": "context_pack_quality",
+  "expected_fixture": "m3_corpus/documents/context-pack-trust.md",
+  "expected_canonical_keys": ["m3:{run_id}:documents/context-pack-trust.md"],
+  "expected_knowledge_types": ["document"],
+  "expected_evidence_terms": ["caveats", "not final answer", "source traceability"],
+  "must_not_canonical_keys": [],
+  "support_required": true,
+  "notes": "No-marker natural phrasing for Context Pack caveat behavior."
+}
+```
+
+Tier 2 manifest draft:
+
+```json
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "path": "data/private/acceptance-inputs/2026-06-10-mcp-real-docs/openai-latest-model.md",
+      "knowledge_type": "document",
+      "canonical_key": "private-m3:openai-latest-model",
+      "tags": ["official_doc", "openai"]
+    }
+  ]
+}
+```
+
+M3A0 acceptance:
+
+* Tier 1 committed corpus has at least 12 source files and 30 no-marker eval queries.
+* Tier 1 query set covers at least: exact lookup, broad project memory, official doc lookup, AI conversation lookup, artifact lookup, caveat/trust behavior.
+* Tier 2 private corpus manifest exists locally or is explicitly deferred; no private source content is committed.
+* Each query defines expected source and at least one expected evidence term.
+* Existing MVP eval remains unchanged and passing.
+
+### M3A1: Retrieval and Context Pack quality baseline
 
 * 扩展 `tests/fixtures/eval_queries.jsonl` 或新增 M3 eval fixture。
 * 增加字段：`query_type`、`expected_evidence_terms`、`must_not_canonical_keys`、`preferred_knowledge_types`、`support_required`。
@@ -164,8 +250,8 @@ Detailed baseline design:
    * 保留现有 `tests/fixtures/eval_queries.jsonl` 的 marker-based 检索测试。
    * 目的：证明基础 ingest/search 没坏，继续作为 regression guard。
    * 不把它当 M3 质量上限，因为 marker query 太容易命中，不代表真实问题。
-2. **Add M3 no-marker eval set**
-   * 新增 `tests/fixtures/m3_eval_queries.jsonl` 或等价文件。
+2. **Add M3 no-marker eval set over the new corpus**
+   * 新增 `tests/fixtures/m3_eval_queries.jsonl` 或等价文件，并指向 M3A0 corpus。
    * query 不拼 marker，尽量模拟真实用户问法。
    * 每行包含 expected source、expected evidence terms、must-not source、query type、notes。
 3. **Measure search quality**
@@ -234,6 +320,14 @@ The first implementation should prefer pytest-only helpers unless the command-li
 **Decision**: M3 uses baseline-first sequencing. M3A establishes retrieval and Context Pack quality baselines before QueryRouter, lexical fusion, Context Pack v1, or semantic/rerank spike.
 
 **Consequences**: Early M3 work spends time on eval design and reports instead of immediately changing retrieval behavior. In exchange, every later retrieval change can be judged against explicit search and Context Pack quality metrics.
+
+### ADR-002: M3 Baseline Requires Corpus First
+
+**Context**: Existing MVP fixtures are intentionally small and marker-heavy. They are useful regression tests but not a meaningful baseline for M3 retrieval and Context Pack quality. Current private data contains useful material, but it is not organized into a stable corpus and must not be committed.
+
+**Decision**: M3A starts with corpus bootstrap. Build a committed, non-private M3 curated corpus for CI and optionally maintain a gitignored private corpus manifest for local quality checks.
+
+**Consequences**: M3 implementation starts one step earlier than originally planned. QueryRouter, fusion, and reranker work wait until there is a stable batch of material and queries to measure against.
 
 ### M3B: RetrievalPlan / QueryRouter v1
 
@@ -333,6 +427,9 @@ Files inspected:
 * `tests/test_context_pack.py`
 * `tests/test_acceptance.py`
 * `tests/fixtures/eval_queries.jsonl`
+* `tests/fixtures/`
+* `data/private/acceptance-inputs/`
+* `data/private/ingest-prep/`
 * `.trellis/tasks/06-03-pkcs-project-plan/prd.md`
 * `.trellis/tasks/06-03-pkcs-mvp-m1-m2/m1-m2-mvp-task-report.md`
 * `.trellis/spec/backend/directory-structure.md`
