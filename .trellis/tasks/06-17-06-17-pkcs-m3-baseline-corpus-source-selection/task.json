@@ -1,0 +1,60 @@
+{
+  "id": "06-17-pkcs-m3-baseline-corpus-source-selection",
+  "name": "06-17-pkcs-m3-baseline-corpus-source-selection",
+  "title": "brainstorm: PKCS M3 baseline corpus source selection",
+  "description": "",
+  "status": "completed",
+  "dev_type": "docs",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-17",
+  "completedAt": "2026-06-17",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 6,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/tasks/06-17-06-17-pkcs-m3-baseline-corpus-source-selection/prd.md",
+    ".trellis/tasks/06-17-06-17-pkcs-m3-baseline-corpus-source-selection/source-selection-notes.md",
+    ".trellis/tasks/06-17-06-17-pkcs-m3-baseline-corpus-source-selection/selected-sources.jsonl",
+    ".trellis/tasks/06-17-06-17-pkcs-m3-baseline-corpus-source-selection/codex-ingest-prompts.md"
+  ],
+  "notes": "Completed source-selection scope on 2026-06-17: selected 100 public candidate documents across AI, game, and anime/animation domains; covered HTML/PDF/MD/DOCX, interviews, official QA, technical docs, recent news, and papers/reports; added Codex prompts for later pkcs-ingest-based download, prepare, ingest, and validation. Actual ingestion remains intentionally out of scope.",
+  "meta": {
+    "state_sync": "2026-06-17: source-selection Trellis task completed; ingestion deferred for explicit later validation."
+  }
+}
