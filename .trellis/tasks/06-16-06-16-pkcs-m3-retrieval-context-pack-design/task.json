@@ -55,8 +55,10 @@
     "tests/test_acceptance.py",
     "tests/test_context_pack.py"
   ],
-  "notes": "M3 design brainstorm started. Initial recommendation is baseline-first: expand retrieval/Context Pack eval, then QueryRouter/RetrievalPlan, lexical fusion, Context Pack v1, and only then semantic/rerank spike.",
+  "notes": "M3 design brainstorm started. User confirmed baseline-first on 2026-06-17. Baseline design now separates deterministic MVP regression, no-marker M3 eval, search quality metrics, Context Pack quality metrics, and JSON baseline reporting.",
   "meta": {
-    "recommended_approach": "baseline-first"
+    "recommended_approach": "baseline-first",
+    "confirmed_approach": "baseline-first",
+    "confirmed_at": "2026-06-17"
   }
 }

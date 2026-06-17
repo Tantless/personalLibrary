@@ -24,7 +24,7 @@
 
 ## Open Questions
 
-* M3 是否采用 baseline-first 路线：先做评测基线与 Context Pack 质量指标，再做 QueryRouter / fusion / Context Pack v1，最后再评估 semantic/rerank？
+* M3A baseline 语料范围：只用合成 fixture，还是同时加入 gitignored private acceptance corpus 的人工运行报告？
 
 ## Requirements (evolving)
 
@@ -34,6 +34,9 @@
 * M3 应支持 multi-pass lexical retrieval，而不是每次只把原始 query 丢给 FTS。
 * M3 应让 Context Pack 输出更明确的 source trust、freshness/caveat、follow-up read 建议。
 * M3 应继续复用现有 `SearchService`、`ReadSourceService`、`ContextPackService`，避免把检索逻辑复制到 CLI/MCP。
+* M3 已确认采用 baseline-first 路线：先建立可重复质量基线，再实现 QueryRouter / lexical fusion / Context Pack v1，最后才评估 semantic/rerank。
+* M3A baseline 必须分开衡量 search quality 与 Context Pack quality；不能只用 top_k hit rate 代表上下文可用性。
+* M3A baseline 必须保留当前 MVP marker-based eval 的确定性，同时新增更接近真实问题的 no-marker eval。
 
 ## Acceptance Criteria (evolving)
 
@@ -42,6 +45,7 @@
 * [ ] M3 设计明确 eval schema 与质量指标。
 * [ ] M3 设计明确不在第一阶段新增哪些重依赖或资料类型。
 * [ ] 用户确认 M3 MVP 范围和第一批 PR 顺序。
+* [x] 用户确认 M3 采用 baseline-first 总路线。
 
 ## Definition of Done (team quality bar)
 
@@ -89,6 +93,10 @@ Cons:
 
 * 语义召回不会立刻提升。
 * 前期会花时间建设评测，而不是马上做“看起来更智能”的功能。
+
+Status:
+
+* Selected by user on 2026-06-17.
 
 ### Approach B: Router/fusion-first M3
 
@@ -149,6 +157,83 @@ Cons:
 * 扩展 `tests/fixtures/eval_queries.jsonl` 或新增 M3 eval fixture。
 * 增加字段：`query_type`、`expected_evidence_terms`、`must_not_canonical_keys`、`preferred_knowledge_types`、`support_required`。
 * 输出 baseline report：top 5、top 10、Context Pack evidence count、evidence support checks、must-not violations。
+
+Detailed baseline design:
+
+1. **Keep the MVP deterministic eval**
+   * 保留现有 `tests/fixtures/eval_queries.jsonl` 的 marker-based 检索测试。
+   * 目的：证明基础 ingest/search 没坏，继续作为 regression guard。
+   * 不把它当 M3 质量上限，因为 marker query 太容易命中，不代表真实问题。
+2. **Add M3 no-marker eval set**
+   * 新增 `tests/fixtures/m3_eval_queries.jsonl` 或等价文件。
+   * query 不拼 marker，尽量模拟真实用户问法。
+   * 每行包含 expected source、expected evidence terms、must-not source、query type、notes。
+3. **Measure search quality**
+   * `top_1_hit`
+   * `top_5_hit`
+   * `top_10_hit`
+   * `expected_source_rank`
+   * `must_not_violations`
+   * `empty_result_count`
+4. **Measure Context Pack quality**
+   * `evidence_count`
+   * `sources_count`
+   * `expected_evidence_terms_found`
+   * `all_evidence_traceable`
+   * `must_not_sources_in_pack`
+   * `followup_read_suggestions_count`
+   * `caveats_present`
+5. **Add a JSON baseline report**
+   * 输出到 gitignored/private path 或 pytest captured output，不提交真实运行数据。
+   * 报告字段包括 run id、query count、hit rates、context support rates、failed cases。
+   * 后续 M3B/M3C/M3D 每次改变 retrieval/Context Pack 都对比该 report。
+
+Draft M3 eval row:
+
+```json
+{
+  "query": "为什么 Context Pack 需要 caveats，而不是直接给最终答案？",
+  "query_type": "context_pack_quality",
+  "expected_fixture": "markdown/context-pack-caveats.md",
+  "expected_canonical_keys": ["eval:{run_id}:markdown/context-pack-caveats.md"],
+  "expected_knowledge_types": ["document"],
+  "expected_evidence_terms": ["Conflicts / Caveats", "未做真正冲突检测"],
+  "must_not_canonical_keys": [],
+  "support_required": true,
+  "notes": "No-marker natural phrasing for Context Pack caveat behavior."
+}
+```
+
+Proposed M3A acceptance thresholds:
+
+* MVP marker-based eval continues to pass existing top 10 >= 80% and top 5 >= 60%.
+* M3 no-marker eval initially records baseline without failing on strict thresholds.
+* M3 no-marker eval must fail only on structural issues: invalid row shape, untraceable evidence, malformed Context Pack, or read_source mapping failure.
+* After first baseline is recorded, later M3 PRs may set minimum non-regression thresholds.
+
+Baseline command shape:
+
+```text
+uv run pytest tests/test_acceptance.py -k m3
+```
+
+or, if the logic grows beyond a test-only helper:
+
+```text
+uv run pkcs eval --suite m3 --output data/private/eval-runs/<run-id>.json
+```
+
+The first implementation should prefer pytest-only helpers unless the command-line report proves necessary.
+
+## Decision (ADR-lite)
+
+### ADR-001: M3 Starts With Baseline
+
+**Context**: Current PKCS has a deterministic MVP retrieval eval, but it mostly measures marker-assisted search hit rate. M3 aims to improve real query handling and Context Pack usefulness, so adding router/fusion/rerank without a quality baseline would make regressions hard to detect.
+
+**Decision**: M3 uses baseline-first sequencing. M3A establishes retrieval and Context Pack quality baselines before QueryRouter, lexical fusion, Context Pack v1, or semantic/rerank spike.
+
+**Consequences**: Early M3 work spends time on eval design and reports instead of immediately changing retrieval behavior. In exchange, every later retrieval change can be judged against explicit search and Context Pack quality metrics.
 
 ### M3B: RetrievalPlan / QueryRouter v1
 
@@ -247,8 +332,8 @@ Files inspected:
 * `src/pkcs/context_pack/service.py`
 * `tests/test_context_pack.py`
 * `tests/test_acceptance.py`
+* `tests/fixtures/eval_queries.jsonl`
 * `.trellis/tasks/06-03-pkcs-project-plan/prd.md`
 * `.trellis/tasks/06-03-pkcs-mvp-m1-m2/m1-m2-mvp-task-report.md`
 * `.trellis/spec/backend/directory-structure.md`
 * `.trellis/spec/backend/quality-guidelines.md`
-
