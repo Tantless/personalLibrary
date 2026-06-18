@@ -1,0 +1,55 @@
+{
+    "generated_at":  "2026-06-18T17:41:03.0136516+08:00",
+    "manifest_count":  100,
+    "db_counts":  {
+                      "image_artifacts":  412,
+                      "chunks":  4248,
+                      "sources":  100,
+                      "table_artifacts":  75,
+                      "ingest_jobs":  100,
+                      "source_versions":  100
+                  },
+    "validation":  {
+                       "pass":  100,
+                       "fail":  0,
+                       "search_smoke_pass":  100,
+                       "title_mismatches":  0,
+                       "reject_pattern_rows":  0,
+                       "missing_db_sources":  0,
+                       "local_artifact_ready_rows":  28
+                   },
+    "by_quality_tier":  [
+                            {
+                                "quality_tier":  "text_only",
+                                "count":  13,
+                                "pass":  13,
+                                "local_artifact_ready":  0
+                            },
+                            {
+                                "quality_tier":  "artifact_ready",
+                                "count":  21,
+                                "pass":  21,
+                                "local_artifact_ready":  21
+                            },
+                            {
+                                "quality_tier":  "high_fidelity",
+                                "count":  66,
+                                "pass":  66,
+                                "local_artifact_ready":  7
+                            }
+                        ],
+    "fallback_counts":  {
+                            "docx_pandoc_markdown":  1,
+                            "reader_markdown":  49,
+                            "html_pandoc_markdown_after_docling_fail":  2,
+                            "none":  34,
+                            "markdown_utf8_sanitized":  1,
+                            "pdftotext_markdown":  13
+                        },
+    "failed_rows":  [
+
+                    ],
+    "source_report_dirs":  [
+                               "Z:\\personalLibrary\\.trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\full-reingest-20260618-171502"
+                           ]
+}

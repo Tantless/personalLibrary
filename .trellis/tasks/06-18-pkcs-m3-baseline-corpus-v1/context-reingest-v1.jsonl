@@ -1,0 +1,5 @@
+{"kind":"task_context","path":".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/prd.md","note":"Defines v1 baseline corpus acceptance criteria and requires clean reingestion only after manifest and smoke gate pass."}
+{"kind":"manifest","path":".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/selected-sources-v1-draft.jsonl","note":"Authoritative 100-row v1 source manifest with quality tier, conversion strategy, fallback policy, validation queries, and minimum quality gate."}
+{"kind":"quality_gate","path":".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-quality-gate-report.json","note":"12-source smoke gate passed: 12 downloaded, 12 prepare passed, 0 hard failures, 0 reject-pattern rows."}
+{"kind":"workflow_rule","path":".agents/skills/pkcs-ingest/SKILL.md","note":"Batch execution must use source validation, smoke batch, batch size <=20, heavy format limit <=5, append-only reports, and failure queue."}
+{"kind":"runtime","path":"src/pkcs/cli.py","note":"Full reingestion will use .venv/Scripts/pkcs.exe prepare-ingest and ingest, which call the same application service as MCP ingest."}

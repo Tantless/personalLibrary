@@ -3,7 +3,7 @@
   "name": "pkcs-m3-baseline-corpus-v1",
   "title": "PKCS M3 baseline corpus v1 manifest and reingestion",
   "description": "Construct M3 baseline corpus v1 manifest, validate quality gates, then clear and reingest.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "docs",
   "scope": null,
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "tantless",
   "assignee": "tantless",
   "createdAt": "2026-06-18",
-  "completedAt": null,
+  "completedAt": "2026-06-18",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 3,
+  "current_phase": 6,
   "next_action": [
     {
       "phase": 1,
@@ -58,11 +58,22 @@
     ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-source-validation-report.jsonl",
     ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-prepare-report.jsonl",
     ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-quality-gate-report.json",
-    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-validation-summary.md"
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-validation-summary.md",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/context-reingest-v1.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/run-full-reingest.ps1",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/summarize-full-reingest.ps1",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/full-reingest-20260618-171502/source-validation.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/full-reingest-20260618-171502/prepare.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/full-reingest-20260618-171502/ingest.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/full-reingest-20260618-171502/quality.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/full-reingest-20260618-171502/summary.json",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/final-reingest-validation/validation.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/final-reingest-validation/summary.json",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/final-reingest-validation/reingestion-result.md"
   ],
-  "notes": "v1 manifest source validation and 12-source smoke prepare gate completed successfully. Next step is clean full reingestion using the validated v1 manifest, with batch size <=20 and heavy formats <=5 per batch.",
+  "notes": "M3 baseline corpus v1 completed: clean full reingestion produced 100 sources, 100 versions, 4248 chunks, 412 image artifacts, 75 table artifacts, 100/100 validation pass, 100/100 search smoke pass, 0 title mismatches, 0 reject-pattern rows.",
   "meta": {
-    "state_sync": "2026-06-18: v1 source validation and smoke prepare gate completed; clean full reingestion not yet executed.",
+    "state_sync": "2026-06-18: v1 clean full reingestion completed and final validation passed.",
     "current_summary": {
       "total_sources": 100,
       "keep": 43,
@@ -82,6 +93,19 @@
       "prepare_fail": 0,
       "hard_fail": 0,
       "pending_title_override": 10
+    },
+    "final_reingest_summary": {
+      "sources": 100,
+      "source_versions": 100,
+      "chunks": 4248,
+      "image_artifacts": 412,
+      "table_artifacts": 75,
+      "validation_pass": 100,
+      "validation_fail": 0,
+      "search_smoke_pass": 100,
+      "title_mismatches": 0,
+      "reject_pattern_rows": 0,
+      "local_artifact_ready_rows": 28
     }
   }
 }

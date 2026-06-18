@@ -1,0 +1,38 @@
+{
+    "generated_at":  "2026-06-18T17:38:16.7506293+08:00",
+    "run_stamp":  "20260618-171502",
+    "manifest_count":  100,
+    "batches":  7,
+    "db_counts":  {
+                      "image_artifacts":  412,
+                      "chunks":  4248,
+                      "sources":  100,
+                      "table_artifacts":  75,
+                      "ingest_jobs":  100,
+                      "source_versions":  100
+                  },
+    "quality":  {
+                    "pass":  94,
+                    "soft_pass":  6,
+                    "fail":  0,
+                    "search_smoke_pass":  100,
+                    "title_mismatches":  0
+                },
+    "fallback":  {
+                     "reader_markdown":  49,
+                     "pdftotext_markdown":  13,
+                     "docx_pandoc_markdown":  1,
+                     "html_pandoc_markdown_after_docling_fail":  2
+                 },
+    "failure_count":  0,
+    "title_mismatches":  [
+
+                         ],
+    "reports":  {
+                    "source_validation":  ".trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\full-reingest-20260618-171502\\source-validation.jsonl",
+                    "prepare":  ".trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\full-reingest-20260618-171502\\prepare.jsonl",
+                    "ingest":  ".trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\full-reingest-20260618-171502\\ingest.jsonl",
+                    "quality":  ".trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\full-reingest-20260618-171502\\quality.jsonl",
+                    "failure_queue":  ".trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\full-reingest-20260618-171502\\failure-queue.jsonl"
+                }
+}
