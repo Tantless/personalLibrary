@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 2,
+  "current_phase": 3,
   "next_action": [
     {
       "phase": 1,
@@ -52,11 +52,17 @@
     ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/quality-audit-summary.json",
     ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/quality-audit-v0.jsonl",
     ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/selected-sources-v1-draft.jsonl",
-    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/replacement-plan.md"
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/replacement-plan.md",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/run-smoke-validation.ps1",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-batch-selection.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-source-validation-report.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-prepare-report.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-quality-gate-report.json",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/smoke-validation-summary.md"
   ],
-  "notes": "Initial v1 manifest construction completed: generated v0 quality audit, v1 draft manifest with keep/repair/replace decisions, and replacement plan for 5 clearly invalid v0 sources. Next step is source validation and smoke batch before any destructive clear/reingest.",
+  "notes": "v1 manifest source validation and 12-source smoke prepare gate completed successfully. Next step is clean full reingestion using the validated v1 manifest, with batch size <=20 and heavy formats <=5 per batch.",
   "meta": {
-    "state_sync": "2026-06-18: v1 manifest/audit phase started; clear/reingest not yet executed.",
+    "state_sync": "2026-06-18: v1 source validation and smoke prepare gate completed; clean full reingestion not yet executed.",
     "current_summary": {
       "total_sources": 100,
       "keep": 43,
@@ -65,6 +71,17 @@
       "text_only": 13,
       "artifact_ready": 22,
       "high_fidelity": 65
+    },
+    "smoke_summary": {
+      "selected": 12,
+      "downloaded": 12,
+      "source_failures": 0,
+      "reader_snapshots": 6,
+      "pdftotext_snapshots": 1,
+      "prepare_pass": 12,
+      "prepare_fail": 0,
+      "hard_fail": 0,
+      "pending_title_override": 10
     }
   }
 }

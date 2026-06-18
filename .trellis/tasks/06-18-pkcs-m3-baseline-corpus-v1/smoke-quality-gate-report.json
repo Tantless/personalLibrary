@@ -1,0 +1,24 @@
+{
+    "generated_at":  "2026-06-18T16:14:26.9622610+08:00",
+    "run_stamp":  "20260618-161126",
+    "selected_count":  12,
+    "source_validation":  {
+                              "downloaded":  12,
+                              "failed":  0,
+                              "reader_snapshot":  6,
+                              "pdftotext_snapshot":  1,
+                              "reject_hit_rows":  0
+                          },
+    "prepare":  {
+                    "pass":  12,
+                    "soft_pass":  0,
+                    "fail":  0,
+                    "hard_fail":  0,
+                    "pending_title_override":  10
+                },
+    "reports":  {
+                    "selection":  ".trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\smoke-batch-selection.jsonl",
+                    "source_validation":  ".trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\smoke-source-validation-report.jsonl",
+                    "prepare":  ".trellis\\tasks\\06-18-pkcs-m3-baseline-corpus-v1\\smoke-prepare-report.jsonl"
+                }
+}

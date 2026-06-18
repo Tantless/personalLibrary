@@ -9,8 +9,8 @@
 | ID | v0 Title | Problem | v1 Replacement |
 |---|---|---|---|
 | `M3-GAME-002` | Unreal Engine: Nanite Virtualized Geometry | v0 raw HTML snapshot 混入重复 JS/cookie challenge 文案 | `https://dev.epicgames.com/documentation/unreal-engine/nanite-virtualized-geometry-in-unreal-engine?lang=en-US` |
-| `M3-GAME-003` | Unreal Engine 5.7 release notes | v0 raw HTML snapshot 混入大量 JS/cookie challenge 文案 | `https://dev.epicgames.com/documentation/unreal-engine/whats-new?lang=en-US` |
-| `M3-GAME-006` | Unreal Engine EULA FAQ | v0 最终文档只有 spinner/page shell | `https://www.unrealengine.com/eula/unreal` |
+| `M3-GAME-003` | Unreal Engine 5.7 release notes | v0 raw HTML snapshot 混入大量 JS/cookie challenge 文案；`What's New` 概览页内容偏短 | `https://dev.epicgames.com/documentation/unreal-engine/unreal-engine-5-8-release-notes?lang=en-US` |
+| `M3-GAME-006` | Unreal Engine EULA FAQ | v0 最终文档只有 spinner/page shell，公开 HTML 对 CLI 抓取返回 challenge/403 | `https://s3.amazonaws.com/EULA/04be6996-1cf1-4f50-9e75-b22db4680516-EULA.pdf` |
 | `M3-GAME-015` | Unity Entities overview | v0 package root 只有 package home placeholder | `https://docs.unity3d.com/Packages/com.unity.entities%401.0/manual/concepts-intro.html` |
 | `M3-GAME-016` | Unity Entities concepts | v0 文本过短，不足以支撑 baseline evaluation | `https://docs.unity3d.com/Packages/com.unity.entities%401.0/manual/whats-new.html` |
 
@@ -18,7 +18,8 @@
 
 * Epic documentation pages must not be ingested from raw saved HTML if the snapshot contains `challenge-error-text` or `Enable JavaScript and cookies to continue`.
 * For Epic docs, use a verified reader snapshot or Playwright-rendered snapshot, then run `prepare-ingest`.
-* For Unity package docs, use concrete manual pages, not package root home pages.
+* For Unreal EULA, prefer the downloadable official PDF over public HTML because the HTML endpoint is not CLI-stable.
+* For Unity package docs, use concrete manual pages, not package root home pages; current smoke shows reader Markdown is more stable than direct HTML -> Docling for these pages.
 * Replacement candidates still need to pass smoke quality gates before any clear/reingest step.
 
 ## Repair Classes
