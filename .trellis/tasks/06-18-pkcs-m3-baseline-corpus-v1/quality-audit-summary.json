@@ -1,0 +1,431 @@
+{
+  "total": 100,
+  "by_decision": {
+    "repair": 52,
+    "keep": 43,
+    "replace": 5
+  },
+  "by_quality_tier": {
+    "text_only": 13,
+    "artifact_ready": 22,
+    "high_fidelity": 65
+  },
+  "replace_ids": [
+    {
+      "id": "M3-GAME-002",
+      "title": "Unreal Engine: Nanite Virtualized Geometry",
+      "reasons": [
+        "blocked_or_challenge_content"
+      ]
+    },
+    {
+      "id": "M3-GAME-003",
+      "title": "Unreal Engine 5.7 release notes",
+      "reasons": [
+        "blocked_or_challenge_content"
+      ]
+    },
+    {
+      "id": "M3-GAME-006",
+      "title": "Unreal Engine EULA FAQ",
+      "reasons": [
+        "placeholder_or_page_shell",
+        "effective_text_too_short"
+      ]
+    },
+    {
+      "id": "M3-GAME-015",
+      "title": "Unity Entities overview",
+      "reasons": [
+        "placeholder_or_page_shell",
+        "effective_text_too_short"
+      ]
+    },
+    {
+      "id": "M3-GAME-016",
+      "title": "Unity Entities concepts",
+      "reasons": [
+        "effective_text_too_short"
+      ]
+    }
+  ],
+  "repair_ids": [
+    {
+      "id": "M3-AI-001",
+      "title": "Predicting LLM Safety Before Release by Simulating Deployment",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-AI-006",
+      "title": "OpenAI: The state of enterprise AI 2025 report",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-AI-007",
+      "title": "OpenAI: How People Use ChatGPT",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-AI-008",
+      "title": "OpenAI GPT-5 System Card",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-AI-009",
+      "title": "OpenAI o3 and o4-mini System Card",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-AI-013",
+      "title": "OpenAI Cookbook README",
+      "reasons": [
+        "effective_text_too_short",
+        "db_title_pollution",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-015",
+      "title": "OpenAI Cookbook: Code modernization with Codex",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-017",
+      "title": "OpenAI Agents Python MCP docs",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-019",
+      "title": "Anthropic: Introducing Claude Opus 4.8",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-020",
+      "title": "Anthropic: Policy on the AI Exponential",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-021",
+      "title": "Anthropic: Claude Fable 5 and Claude Mythos 5",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-022",
+      "title": "Anthropic: Agentic coding and persistent returns to expertise",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-023",
+      "title": "Anthropic Economic Index: Economic Primitives",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-AI-024",
+      "title": "Anthropic Economic Index: Learning curves",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-025",
+      "title": "Anthropic: Alignment Faking in Large Language Models",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-AI-026",
+      "title": "Anthropic: How AI Is Transforming Work at Anthropic",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-028",
+      "title": "The 2025 AI Agent Index PDF",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-AI-029",
+      "title": "arXiv: The 2025 AI Agent Index",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-030",
+      "title": "Google: DiffusionGemma 4x faster text generation",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-031",
+      "title": "Google: Gemini 3.5 frontier intelligence with action",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-032",
+      "title": "Google DeepMind: Co-Scientist multi-agent AI partner",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-033",
+      "title": "Google DeepMind: AlphaEvolve impact",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-034",
+      "title": "Google I/O 2026 Sundar Pichai remarks",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-041",
+      "title": "3GPP AIML_CAL draft TR",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-AI-043",
+      "title": "ITU AI for Health report",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-AI-044",
+      "title": "GSA Artificial Intelligence White Paper",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-ANIME-003",
+      "title": "Toei Animation PERO'S REPORT",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-ANIME-004",
+      "title": "Archiving Movements: Directing at Anime Animation Studios",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-ANIME-013",
+      "title": "Crunchyroll: Sentenced to Be a Hero anime directors interview",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-ANIME-014",
+      "title": "Crunchyroll: Frieren anime staff interview",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-ANIME-015",
+      "title": "Crunchyroll: Chainsaw Man Reze Arc staff interview",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-ANIME-016",
+      "title": "Crunchyroll: Toei Animation producer Hiromi Seki Digimon interview",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-ANIME-017",
+      "title": "Crunchyroll: Witch Hat Atelier creator and anime staff interview",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-GAME-005",
+      "title": "Unreal Engine FAQ",
+      "reasons": [
+        "effective_text_too_short",
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-GAME-007",
+      "title": "Unreal Engine: Understanding the Basics",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-008",
+      "title": "Unreal developer interview: Clair Obscur autonomy, creativity, and community",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-GAME-010",
+      "title": "Unreal developer interview: How AdHoc used Unreal Engine for Dispatch",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-GAME-012",
+      "title": "Unreal developer interview: Milestone leans into UE5 for MotoGP 25",
+      "reasons": [
+        "db_title_pollution"
+      ]
+    },
+    {
+      "id": "M3-GAME-013",
+      "title": "Unity: How Ghost Town makes VR movement feel natural",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-014",
+      "title": "Unity 6.5 User Manual",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-017",
+      "title": "Unity Gaming Report 2025 launch",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-018",
+      "title": "Unity: Blue Prince Dogubomb interview",
+      "reasons": [
+        "many_missing_images",
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-019",
+      "title": "Unity: How to prepare and pitch your indie game",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-020",
+      "title": "Unity: How to choose the right netcode for your game",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-021",
+      "title": "Godot: GDScript documentation comments",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-023",
+      "title": "Godot: Submitting to the Asset Library",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-025",
+      "title": "GDC 2025 State of the Game Industry landing page",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-026",
+      "title": "ESA 2025 Essential Facts booklet",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-GAME-027",
+      "title": "NVIDIA Unreal Engine 5.4 Raytracing Guideline",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-GAME-028",
+      "title": "SIGGRAPH 2022 Advances in Real-Time Rendering: Lumen",
+      "reasons": [
+        "pdf_text_only_fallback"
+      ]
+    },
+    {
+      "id": "M3-GAME-031",
+      "title": "Godot engine README",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    },
+    {
+      "id": "M3-GAME-032",
+      "title": "Phaser README",
+      "reasons": [
+        "prepare_soft_fail"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "id": "pkcs-m3-baseline-corpus-v1",
+  "name": "pkcs-m3-baseline-corpus-v1",
+  "title": "PKCS M3 baseline corpus v1 manifest and reingestion",
+  "description": "Construct M3 baseline corpus v1 manifest, validate quality gates, then clear and reingest.",
+  "status": "in_progress",
+  "dev_type": "docs",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-18",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 2,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/prd.md",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/quality-audit-summary.json",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/quality-audit-v0.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/selected-sources-v1-draft.jsonl",
+    ".trellis/tasks/06-18-pkcs-m3-baseline-corpus-v1/replacement-plan.md"
+  ],
+  "notes": "Initial v1 manifest construction completed: generated v0 quality audit, v1 draft manifest with keep/repair/replace decisions, and replacement plan for 5 clearly invalid v0 sources. Next step is source validation and smoke batch before any destructive clear/reingest.",
+  "meta": {
+    "state_sync": "2026-06-18: v1 manifest/audit phase started; clear/reingest not yet executed.",
+    "current_summary": {
+      "total_sources": 100,
+      "keep": 43,
+      "repair": 52,
+      "replace": 5,
+      "text_only": 13,
+      "artifact_ready": 22,
+      "high_fidelity": 65
+    }
+  }
+}
