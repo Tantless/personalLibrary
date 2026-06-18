@@ -1,0 +1,62 @@
+{
+  "id": "pkcs-ingest-skill-refinement",
+  "name": "pkcs-ingest-skill-refinement",
+  "title": "brainstorm: refine pkcs-ingest skill from m3 corpus ingestion",
+  "description": "Refine pkcs-ingest skill based on M3 100-document corpus ingestion failures.",
+  "status": "completed",
+  "dev_type": "docs",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-18",
+  "completedAt": "2026-06-18",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 6,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/tasks/06-18-pkcs-ingest-skill-refinement/prd.md",
+    ".agents/skills/pkcs-ingest/SKILL.md",
+    ".trellis/tasks/06-17-06-17-pkcs-m3-baseline-corpus-ingestion/ingestion-result.md"
+  ],
+  "notes": "Completed skill refinement after reviewing the M3 baseline corpus ingestion failure modes. Updated pkcs-ingest to distinguish single-file and batch/public corpus modes, prefer .venv CLI for Windows long batches, require source validation and smoke batches, define timeout/retry policy, document Docling fallback boundaries, and allow CLI-equivalent ingest when MCP tools are not exposed.",
+  "meta": {
+    "verification": [
+      "git diff --check"
+    ],
+    "state_sync": "2026-06-18: task completed as documentation/skill workflow refinement; no runtime code changed."
+  }
+}
