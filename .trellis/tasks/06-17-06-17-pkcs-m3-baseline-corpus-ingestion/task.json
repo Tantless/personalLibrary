@@ -1,0 +1,59 @@
+{
+  "id": "06-17-pkcs-m3-baseline-corpus-ingestion",
+  "name": "06-17-pkcs-m3-baseline-corpus-ingestion",
+  "title": "PKCS M3 baseline corpus ingestion",
+  "description": "",
+  "status": "completed",
+  "dev_type": "docs",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-17",
+  "completedAt": "2026-06-18",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 6,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/tasks/06-17-06-17-pkcs-m3-baseline-corpus-ingestion/prd.md",
+    ".trellis/tasks/06-17-06-17-pkcs-m3-baseline-corpus-ingestion/ingestion-result.md",
+    ".trellis/tasks/06-17-06-17-pkcs-m3-baseline-corpus-source-selection/selected-sources.jsonl"
+  ],
+  "notes": "Completed on 2026-06-18. Local data/private and data/raw were cleared, database schema was reset, 100 candidate public sources were downloaded/replaced as needed, 100 normalized packages were prepared with accepted degradation for missing images and fallback Markdown snapshots, and 100 sources were ingested into PKCS through the CLI-equivalent ingestion path. Sample search/read/context-pack validation passed.",
+  "meta": {
+    "state_sync": "2026-06-18: task completed after recovering from long-running Docling/uv failures; see ingestion-result.md for details."
+  }
+}

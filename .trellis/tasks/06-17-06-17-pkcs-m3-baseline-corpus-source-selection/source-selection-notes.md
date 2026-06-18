@@ -6,10 +6,10 @@
 
 | Format | Count | Intended handling |
 |---|---:|---|
-| HTML | 57 | 下载/保存为 `.html`，再运行 `prepare-ingest` |
+| HTML | 52 | 下载/保存为 `.html`，再运行 `prepare-ingest` |
 | PDF | 23 | 直接下载为 `.pdf`，由 Docling 规范化 |
-| MD | 13 | 下载 raw Markdown 为 `.md`，无需 Docling |
-| DOCX | 7 | 直接下载为 `.docx`，由 Docling 规范化 |
+| MD | 19 | 下载 raw Markdown 为 `.md`，无需 Docling |
+| DOCX | 6 | 直接下载为 `.docx`，由 Docling 规范化 |
 
 领域分布：
 
