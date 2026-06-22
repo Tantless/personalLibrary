@@ -58,10 +58,15 @@
     "tests/test_planned_search.py",
     "tests/test_context_pack.py"
   ],
-  "notes": "M3C design started on 2026-06-22 after M3B completion. Recommended direction is eval expansion plus simple-vs-planned comparator first, with semantic/hybrid retrieval deferred until diagnostics show repeated lexical failure classes.",
+  "notes": "M3C design started on 2026-06-22 after M3B completion. User selected MVP option 2: implement eval schema v2 plus simple-vs-planned comparator/report first, and defer the first expanded diagnostic query set to a follow-up task. Semantic/hybrid retrieval remains deferred until diagnostics show repeated lexical failure classes.",
   "meta": {
     "recommended_approach": "eval_expansion_plus_comparator_first",
+    "confirmed_approach": "schema_and_comparator_first",
+    "confirmed_at": "2026-06-22",
+    "mvp_includes_expanded_diagnostic_queries": false,
+    "follow_up": "first_expanded_diagnostic_query_set",
     "deferred": [
+      "first_expanded_diagnostic_query_set",
       "machine_translation_adapter",
       "llm_query_planner",
       "embeddings_pgvector",
