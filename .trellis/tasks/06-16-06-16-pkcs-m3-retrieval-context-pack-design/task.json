@@ -47,7 +47,8 @@
   "subtasks": [],
   "children": [
     "06-22-06-22-pkcs-m3a1-quality-baseline",
-    "06-22-pkcs-m3c-retrieval-quality-validation"
+    "06-22-pkcs-m3c-retrieval-quality-validation",
+    "06-22-pkcs-m3d-diagnostic-query-set"
   ],
   "parent": null,
   "relatedFiles": [
@@ -58,13 +59,16 @@
     "tests/test_acceptance.py",
     "tests/test_context_pack.py"
   ],
-  "notes": "M3 design brainstorm started. User confirmed baseline-first on 2026-06-17 and pointed out baseline requires a real corpus. M3A0 corpus bootstrap and M3A1 baseline eval scaffold are now complete. Baseline run shows Chinese natural questions currently return empty results against mostly English corpus content, so M3B should start with query normalization/keyword extraction before changing retrieval behavior.",
+  "notes": "M3 design brainstorm started. User confirmed baseline-first on 2026-06-17 and pointed out baseline requires a real corpus. M3A0 corpus bootstrap and M3A1 baseline eval scaffold are complete. M3C added eval schema v2 and simple-vs-planned comparison reporting. M3D added the first expanded diagnostic query set and report-only baseline; planned retrieval improved over simple FTS while remaining failures point to targeted alias and evidence-selection follow-up work.",
   "meta": {
     "recommended_approach": "baseline-first",
     "confirmed_approach": "baseline-first",
     "confirmed_at": "2026-06-17",
     "baseline_corpus_decision": "private_m3_corpus_v1_completed",
     "baseline_eval_scaffold": "completed_on_2026-06-22",
-    "m3a1_baseline_observation": "Chinese natural no-marker eval queries produced 6/6 empty results with simple FTS; English title-style smoke queries hit expected sources."
+    "m3a1_baseline_observation": "Chinese natural no-marker eval queries produced 6/6 empty results with simple FTS; English title-style smoke queries hit expected sources.",
+    "m3d_latest_private_report": "data/private/eval-runs/m3d-diagnostic-pr1-20260622.json",
+    "m3d_observation": "28-row locked+diagnostic report: planned_top_10_hit_rate 0.9643, locked_regression_pass_rate 1.0, remaining failures missing_alias=1 and evidence_selection_gap=1.",
+    "recommended_next_step": "M3E targeted alias and evidence-selection follow-up"
   }
 }

@@ -1,0 +1,95 @@
+{
+  "id": "pkcs-m3d-diagnostic-query-set",
+  "name": "pkcs-m3d-diagnostic-query-set",
+  "title": "PKCS M3D expanded diagnostic query set",
+  "description": "Build the first expanded M3 diagnostic query set and report-only comparison baseline after M3C.",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-22",
+  "completedAt": "2026-06-22",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 6,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "06-16-06-16-pkcs-m3-retrieval-context-pack-design",
+  "relatedFiles": [
+    ".trellis/tasks/06-22-pkcs-m3d-diagnostic-query-set/prd.md",
+    ".trellis/tasks/06-22-pkcs-m3d-diagnostic-query-set/m3d-diagnostic-report.md",
+    ".trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/m3d-diagnostic-query-set-handoff.md",
+    ".trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/multilingual-roadmap-adr.md",
+    "tests/fixtures/m3_eval_queries.jsonl",
+    "tests/fixtures/m3_diagnostic_queries.jsonl",
+    "tests/test_m3_eval.py",
+    "src/pkcs/eval/models.py",
+    "src/pkcs/eval/m3_baseline.py"
+  ],
+  "notes": "M3D completed on 2026-06-22 after M3C completion. Added the first expanded diagnostic query set with 22 rows, kept locked regression rows separate, added fixture coverage and report-only comparison tests, and generated a private local report at data/private/eval-runs/m3d-diagnostic-pr1-20260622.json. Planned retrieval improved over simple FTS, locked regression stayed 100%, and the remaining failures point to a small M3E alias/evidence-selection follow-up.",
+  "meta": {
+    "confirmed_source_task": "06-22-pkcs-m3c-retrieval-quality-validation",
+    "m3d_meaning": "expanded diagnostic query set",
+    "fixture_path": "tests/fixtures/m3_diagnostic_queries.jsonl",
+    "locked_regression_fixture": "tests/fixtures/m3_eval_queries.jsonl",
+    "latest_private_report": "data/private/eval-runs/m3d-diagnostic-pr1-20260622.json",
+    "diagnostic_row_count": 22,
+    "combined_report_row_count": 28,
+    "report_summary": {
+      "simple_top_10_hit_rate": 0.1071,
+      "planned_top_10_hit_rate": 0.9643,
+      "planned_context_support_rate": 0.9286,
+      "locked_regression_pass_rate": 1.0,
+      "context_support_miss_count": 2
+    },
+    "failure_classes": {
+      "evidence_selection_gap": 1,
+      "missing_alias": 1,
+      "missing_glossary": 0,
+      "semantic_gap": 0
+    },
+    "report_only": true,
+    "next_pr_sized_step": "M3E targeted alias and evidence-selection follow-up",
+    "deferred": [
+      "retrieval_behavior_changes",
+      "machine_translation_adapter",
+      "llm_query_planner",
+      "embeddings_pgvector",
+      "reranker",
+      "language_specific_analyzers",
+      "hard_ci_gate_for_diagnostic_rows"
+    ]
+  }
+}

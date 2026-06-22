@@ -38,6 +38,7 @@ from pkcs.search.planning import (
 
 
 M3_EVAL_FIXTURE = Path("tests/fixtures/m3_eval_queries.jsonl")
+M3_DIAGNOSTIC_FIXTURE = Path("tests/fixtures/m3_diagnostic_queries.jsonl")
 
 
 def test_m3_eval_query_fixture_has_required_shape() -> None:
@@ -56,6 +57,33 @@ def test_m3_eval_query_fixture_has_required_shape() -> None:
     assert all(row.expected_intent == row.query_type for row in rows)
     assert all(row.expected_pass_names == [] for row in rows)
     assert all(row.diagnostic_tags == [] for row in rows)
+
+
+def test_m3_diagnostic_query_fixture_has_v2_coverage() -> None:
+    rows = load_m3_eval_queries(M3_DIAGNOSTIC_FIXTURE)
+
+    assert len(rows) >= 20
+    assert {row.suite for row in rows} == {M3_EVAL_SUITE_DIAGNOSTIC}
+    assert {row.language for row in rows} >= {"zh", "en", "ja", "mixed"}
+    assert {row.query_style for row in rows} >= {
+        "exact_title",
+        "natural_question",
+        "paraphrase",
+        "broad_recall",
+        "negative_or_ambiguous",
+    }
+    assert {row.query_type for row in rows} >= {
+        "official_doc_lookup",
+        "safety_report_lookup",
+        "broad_project_lookup",
+        "recent_technical_lookup",
+    }
+    assert all(row.expected_intent == row.query_type for row in rows)
+    assert all(row.expected_pass_names for row in rows)
+    assert all(row.diagnostic_tags for row in rows)
+    assert all(row.expected_canonical_keys for row in rows)
+    assert all(row.expected_evidence_terms for row in rows)
+    assert all(row.support_required for row in rows)
 
 
 def test_m3_eval_query_loader_rejects_invalid_rows(tmp_path) -> None:
@@ -387,6 +415,56 @@ def test_m3_comparison_evaluator_marks_evidence_selection_gap() -> None:
     assert body["results"][0]["failure_classes"] == [M3_FAILURE_EVIDENCE_SELECTION_GAP]
     assert body["results"][0]["planned_search"]["top_10_hit"] is True
     assert body["results"][0]["planned_context_pack"]["support_satisfied"] is False
+
+
+def test_m3_comparison_evaluator_handles_locked_and_diagnostic_rows() -> None:
+    locked_rows = load_m3_eval_queries(M3_EVAL_FIXTURE)
+    diagnostic_rows = load_m3_eval_queries(M3_DIAGNOSTIC_FIXTURE)
+    rows = locked_rows + diagnostic_rows
+    planned_responses = {}
+    context_responses = {}
+
+    for index, row in enumerate(rows, start=1):
+        pass_names = row.expected_pass_names or [PASS_ORIGINAL]
+        planned_responses[row.query] = planned_response(
+            row.query,
+            results=[
+                search_result_with_pass_hits(
+                    f"planned-hit-{index}",
+                    row.expected_canonical_keys[0],
+                    pass_names,
+                )
+            ],
+            pass_runs=[
+                PlannedSearchPassRun(name=pass_name, query=pass_name, result_count=1)
+                for pass_name in pass_names
+            ],
+        )
+        context_responses[row.query] = context_pack_response(
+            query=row.query,
+            canonical_key=row.expected_canonical_keys[0],
+            content=" ".join(row.expected_evidence_terms),
+        )
+
+    evaluator = M3ComparisonEvaluator(
+        simple_search_service=MappingSearchService({row.query: [] for row in rows}),
+        planned_search_service=MappingPlannedSearchService(planned_responses),
+        context_pack_service=MappingContextPackService(context_responses),
+        search_top_k=10,
+        context_top_k=5,
+    )
+
+    report = evaluator.evaluate(rows, generated_at="2026-06-22T00:00:00+00:00")
+    body = report.to_dict()
+
+    assert body["summary"]["query_count"] == len(rows)
+    assert body["summary"]["locked_regression_query_count"] == len(locked_rows)
+    assert body["summary"]["planned_top_10_hit_rate"] == 1
+    assert body["summary"]["planned_context_support_rate"] == 1
+    assert {item["suite"] for item in body["results"]} == {
+        M3_EVAL_SUITE_LOCKED_REGRESSION,
+        M3_EVAL_SUITE_DIAGNOSTIC,
+    }
 
 
 def test_write_m3_comparison_report_writes_json(tmp_path) -> None:
