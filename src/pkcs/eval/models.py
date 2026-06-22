@@ -2,6 +2,24 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
+M3_EVAL_LANGUAGE_VALUES = {"zh", "en", "ja", "mixed"}
+M3_EVAL_QUERY_STYLE_VALUES = {
+    "broad_recall",
+    "exact_title",
+    "natural_question",
+    "negative_or_ambiguous",
+    "paraphrase",
+}
+M3_EVAL_SUITE_DIAGNOSTIC = "diagnostic"
+M3_EVAL_SUITE_LOCKED_REGRESSION = "locked_regression"
+M3_EVAL_SUITE_PRIVATE_DIAGNOSTIC = "private_diagnostic"
+M3_EVAL_SUITE_VALUES = {
+    M3_EVAL_SUITE_DIAGNOSTIC,
+    M3_EVAL_SUITE_LOCKED_REGRESSION,
+    M3_EVAL_SUITE_PRIVATE_DIAGNOSTIC,
+}
+
+
 class M3EvalInputError(ValueError):
     pass
 
@@ -15,6 +33,16 @@ class M3EvalQuery:
     must_not_canonical_keys: list[str] = field(default_factory=list)
     support_required: bool = True
     notes: str = ""
+    suite: str = M3_EVAL_SUITE_LOCKED_REGRESSION
+    language: str | None = None
+    query_style: str | None = None
+    expected_intent: str | None = None
+    expected_pass_names: list[str] = field(default_factory=list)
+    diagnostic_tags: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.expected_intent is None:
+            object.__setattr__(self, "expected_intent", self.query_type)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any], *, line_number: int | None = None) -> "M3EvalQuery":
@@ -24,6 +52,28 @@ class M3EvalQuery:
         expected_canonical_keys = _required_string_list(payload, "expected_canonical_keys", prefix)
         expected_evidence_terms = _required_string_list(payload, "expected_evidence_terms", prefix)
         must_not_canonical_keys = _optional_string_list(payload, "must_not_canonical_keys", prefix)
+        suite = _optional_string(
+            payload,
+            "suite",
+            prefix,
+            default=M3_EVAL_SUITE_LOCKED_REGRESSION,
+            allowed_values=M3_EVAL_SUITE_VALUES,
+        )
+        language = _optional_string(
+            payload,
+            "language",
+            prefix,
+            allowed_values=M3_EVAL_LANGUAGE_VALUES,
+        )
+        query_style = _optional_string(
+            payload,
+            "query_style",
+            prefix,
+            allowed_values=M3_EVAL_QUERY_STYLE_VALUES,
+        )
+        expected_intent = _optional_string(payload, "expected_intent", prefix, default=query_type)
+        expected_pass_names = _optional_string_list(payload, "expected_pass_names", prefix)
+        diagnostic_tags = _optional_string_list(payload, "diagnostic_tags", prefix)
         support_required = payload.get("support_required", True)
         if not isinstance(support_required, bool):
             raise M3EvalInputError(f"{prefix}support_required must be a boolean")
@@ -40,6 +90,12 @@ class M3EvalQuery:
             must_not_canonical_keys=must_not_canonical_keys,
             support_required=support_required,
             notes=notes,
+            suite=suite or M3_EVAL_SUITE_LOCKED_REGRESSION,
+            language=language,
+            query_style=query_style,
+            expected_intent=expected_intent,
+            expected_pass_names=expected_pass_names,
+            diagnostic_tags=diagnostic_tags,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -158,3 +214,23 @@ def _optional_string_list(payload: dict[str, Any], field_name: str, prefix: str)
             raise M3EvalInputError(f"{prefix}{field_name}[{index}] must be a non-empty string")
         values.append(item.strip())
     return values
+
+
+def _optional_string(
+    payload: dict[str, Any],
+    field_name: str,
+    prefix: str,
+    *,
+    default: str | None = None,
+    allowed_values: set[str] | None = None,
+) -> str | None:
+    value = payload.get(field_name, default)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise M3EvalInputError(f"{prefix}{field_name} must be a non-empty string when present")
+    normalized = value.strip()
+    if allowed_values is not None and normalized not in allowed_values:
+        allowed = ", ".join(sorted(allowed_values))
+        raise M3EvalInputError(f"{prefix}{field_name} must be one of: {allowed}")
+    return normalized

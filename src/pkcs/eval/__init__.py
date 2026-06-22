@@ -1,5 +1,11 @@
 from pkcs.eval.m3_baseline import M3BaselineEvaluator, load_m3_eval_queries
 from pkcs.eval.models import (
+    M3_EVAL_LANGUAGE_VALUES,
+    M3_EVAL_QUERY_STYLE_VALUES,
+    M3_EVAL_SUITE_DIAGNOSTIC,
+    M3_EVAL_SUITE_LOCKED_REGRESSION,
+    M3_EVAL_SUITE_PRIVATE_DIAGNOSTIC,
+    M3_EVAL_SUITE_VALUES,
     M3ContextPackQuality,
     M3EvalInputError,
     M3EvalQuery,
@@ -10,6 +16,12 @@ from pkcs.eval.models import (
 )
 
 __all__ = [
+    "M3_EVAL_LANGUAGE_VALUES",
+    "M3_EVAL_QUERY_STYLE_VALUES",
+    "M3_EVAL_SUITE_DIAGNOSTIC",
+    "M3_EVAL_SUITE_LOCKED_REGRESSION",
+    "M3_EVAL_SUITE_PRIVATE_DIAGNOSTIC",
+    "M3_EVAL_SUITE_VALUES",
     "M3BaselineEvaluator",
     "M3ContextPackQuality",
     "M3EvalInputError",

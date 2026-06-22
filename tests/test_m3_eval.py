@@ -9,7 +9,14 @@ from pkcs.context_pack.models import (
     ContextPackSource,
     FollowupReadSuggestion,
 )
-from pkcs.eval import M3BaselineEvaluator, M3EvalInputError, M3EvalQuery, load_m3_eval_queries
+from pkcs.eval import (
+    M3_EVAL_SUITE_DIAGNOSTIC,
+    M3_EVAL_SUITE_LOCKED_REGRESSION,
+    M3BaselineEvaluator,
+    M3EvalInputError,
+    M3EvalQuery,
+    load_m3_eval_queries,
+)
 from pkcs.search.models import SearchCitation, SearchResponse, SearchResult
 
 
@@ -28,6 +35,10 @@ def test_m3_eval_query_fixture_has_required_shape() -> None:
     }
     assert all(row.expected_canonical_keys for row in rows)
     assert all(row.expected_evidence_terms for row in rows)
+    assert {row.suite for row in rows} == {M3_EVAL_SUITE_LOCKED_REGRESSION}
+    assert all(row.expected_intent == row.query_type for row in rows)
+    assert all(row.expected_pass_names == [] for row in rows)
+    assert all(row.diagnostic_tags == [] for row in rows)
 
 
 def test_m3_eval_query_loader_rejects_invalid_rows(tmp_path) -> None:
@@ -36,6 +47,88 @@ def test_m3_eval_query_loader_rejects_invalid_rows(tmp_path) -> None:
 
     with pytest.raises(M3EvalInputError, match="query_type"):
         load_m3_eval_queries(path)
+
+
+def test_m3_eval_query_loader_accepts_v2_diagnostic_metadata(tmp_path) -> None:
+    path = tmp_path / "v2.jsonl"
+    payload = {
+        "query": "Agents SDK 如何处理工具调用？",
+        "query_type": "official_doc_lookup",
+        "suite": M3_EVAL_SUITE_DIAGNOSTIC,
+        "language": "mixed",
+        "query_style": "natural_question",
+        "expected_intent": "official_doc_lookup",
+        "expected_pass_names": [
+            "ascii_entity",
+            "glossary_expansion",
+            "source_alias",
+            "combined",
+        ],
+        "diagnostic_tags": ["mixed_language", "technical_term"],
+        "expected_canonical_keys": ["m3-corpus:ai:openai-agents-python-tools"],
+        "expected_evidence_terms": ["tools", "function tools"],
+        "must_not_canonical_keys": [],
+        "support_required": True,
+        "notes": "v2 row",
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    rows = load_m3_eval_queries(path)
+    row = rows[0]
+
+    assert row.suite == M3_EVAL_SUITE_DIAGNOSTIC
+    assert row.language == "mixed"
+    assert row.query_style == "natural_question"
+    assert row.expected_intent == "official_doc_lookup"
+    assert row.expected_pass_names == [
+        "ascii_entity",
+        "glossary_expansion",
+        "source_alias",
+        "combined",
+    ]
+    assert row.diagnostic_tags == ["mixed_language", "technical_term"]
+    assert row.to_dict()["suite"] == M3_EVAL_SUITE_DIAGNOSTIC
+
+
+def test_m3_eval_query_loader_rejects_invalid_v2_metadata(tmp_path) -> None:
+    path = tmp_path / "bad_v2.jsonl"
+    payload = {
+        "query": "Agents SDK 如何处理工具调用？",
+        "query_type": "official_doc_lookup",
+        "suite": "unknown_suite",
+        "expected_canonical_keys": ["m3-corpus:ai:openai-agents-python-tools"],
+        "expected_evidence_terms": ["tools", "function tools"],
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    with pytest.raises(M3EvalInputError, match="suite must be one of"):
+        load_m3_eval_queries(path)
+
+
+def test_m3_eval_query_loader_rejects_invalid_expected_pass_names(tmp_path) -> None:
+    path = tmp_path / "bad_passes.jsonl"
+    payload = {
+        "query": "Agents SDK 如何处理工具调用？",
+        "query_type": "official_doc_lookup",
+        "expected_canonical_keys": ["m3-corpus:ai:openai-agents-python-tools"],
+        "expected_evidence_terms": ["tools", "function tools"],
+        "expected_pass_names": ["original", ""],
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    with pytest.raises(M3EvalInputError, match=r"expected_pass_names\[2\]"):
+        load_m3_eval_queries(path)
+
+
+def test_m3_eval_query_defaults_expected_intent_when_constructed_directly() -> None:
+    row = M3EvalQuery(
+        query="Agents SDK 如何处理工具调用？",
+        query_type="official_doc_lookup",
+        expected_canonical_keys=["m3-corpus:ai:openai-agents-python-tools"],
+        expected_evidence_terms=["tools"],
+    )
+
+    assert row.expected_intent == "official_doc_lookup"
 
 
 def test_m3_baseline_evaluator_reports_search_and_context_metrics() -> None:

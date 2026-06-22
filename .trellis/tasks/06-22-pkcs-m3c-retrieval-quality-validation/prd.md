@@ -251,6 +251,13 @@ Verification:
 * `tests/test_m3_eval.py` covers old and new rows.
 * Existing M3A1/M3B fixture still loads.
 
+Status on 2026-06-22:
+
+* Implemented locally in PR1: `M3EvalQuery` now accepts optional schema v2 metadata, old fixture rows default to `locked_regression`, and `expected_intent` defaults to `query_type`.
+* Added loader tests for v1 compatibility, valid v2 diagnostic metadata, invalid suite values, and invalid expected pass names.
+* Did not add expanded diagnostic query rows; that remains deferred to M3D.
+* Verified with `uv run pytest tests\test_m3_eval.py -q`, `uv run alembic upgrade head`, `uv run pytest`, and `git diff --check`.
+
 ### PR2: Planned-vs-simple comparison report
 
 * Add evaluator that runs simple `SearchService`, `PlannedSearchService`, and planned `ContextPackService` for each row.

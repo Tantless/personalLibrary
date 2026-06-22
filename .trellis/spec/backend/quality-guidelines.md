@@ -91,3 +91,5 @@ For PR6, do not add PR7 eval corpus or MCP client acceptance; keep it to Context
 For PR7, keep changes to synthetic fixtures, acceptance tests, docs, and specs unless a defect in earlier MVP behavior is exposed.
 
 For M3 eval baseline work, keep report calculation separate from retrieval changes. Add query/report schema tests first, then compare later QueryRouter or fusion PRs against the baseline instead of changing ranking and metrics in the same PR.
+
+For M3C eval schema work, keep v1 fixture rows backward-compatible and validate v2 diagnostic metadata in `tests/test_m3_eval.py` without adding expanded diagnostic queries or changing retrieval behavior in the same PR.

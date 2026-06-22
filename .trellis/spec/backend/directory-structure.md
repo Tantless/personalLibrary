@@ -63,6 +63,7 @@ src/pkcs/
 - Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.
 - Context Pack services own retrieval orchestration, lightweight artifact hydration, and Markdown rendering; the default settings path uses `PlannedSearchService` plus `ReadSourceService`, and tests may still inject `SearchService` for simple-search coverage. Context Pack code uses artifact repositories only to hydrate already-selected evidence.
 - Eval modules own local query-set parsing and quality report calculation. They call `SearchService` and `ContextPackService` instead of duplicating retrieval or evidence assembly logic.
+- M3 eval schema v2 rows may add `suite`, `language`, `query_style`, `expected_intent`, `expected_pass_names`, and `diagnostic_tags`; old rows must keep loading, default `suite` to `locked_regression`, and default `expected_intent` to `query_type`.
 - Eval fixtures committed under `tests/fixtures/` must be synthetic or public-reference metadata only. Private corpus source files and local baseline run outputs stay under gitignored `data/private/`.
 - Retrieval planning belongs in `src/pkcs/search/planning.py`. It converts a user query into a `RetrievalPlan` with named passes, intent, fusion method, and debug metadata; it must not execute search SQL or read/write database rows.
 - Deterministic query planning may use reusable entity extraction, glossary terms, and source aliases, but must not map whole eval questions directly to source-specific queries.

@@ -3,7 +3,7 @@
   "name": "pkcs-m3c-retrieval-quality-validation",
   "title": "brainstorm: PKCS M3C retrieval quality validation and multilingual roadmap",
   "description": "Design the post-M3B validation and long-term multilingual retrieval roadmap: expand eval coverage, compare planned retrieval quality, and define criteria for future semantic/hybrid retrieval.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 1,
+  "current_phase": 3,
   "next_action": [
     {
       "phase": 1,
@@ -50,15 +50,18 @@
   "relatedFiles": [
     ".trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/prd.md",
     "src/pkcs/eval/models.py",
+    "src/pkcs/eval/__init__.py",
     "src/pkcs/eval/m3_baseline.py",
     "src/pkcs/search/planning.py",
     "src/pkcs/search/planned.py",
     "tests/fixtures/m3_eval_queries.jsonl",
     "tests/test_m3_eval.py",
     "tests/test_planned_search.py",
-    "tests/test_context_pack.py"
+    "tests/test_context_pack.py",
+    ".trellis/spec/backend/directory-structure.md",
+    ".trellis/spec/backend/quality-guidelines.md"
   ],
-  "notes": "M3C design started on 2026-06-22 after M3B completion. User selected MVP option 2: implement eval schema v2 plus simple-vs-planned comparator/report first, and defer the first expanded diagnostic query set to a follow-up task. Semantic/hybrid retrieval remains deferred until diagnostics show repeated lexical failure classes.",
+  "notes": "M3C design started on 2026-06-22 after M3B completion. User selected MVP option 2: implement eval schema v2 plus simple-vs-planned comparator/report first, and defer the first expanded diagnostic query set to a follow-up task. Semantic/hybrid retrieval remains deferred until diagnostics show repeated lexical failure classes. PR1 schema v2 is implemented and verified: optional diagnostic metadata is accepted, v1 rows default to locked_regression, and tests cover compatibility and validation.",
   "meta": {
     "recommended_approach": "eval_expansion_plus_comparator_first",
     "confirmed_approach": "schema_and_comparator_first",
