@@ -1,0 +1,72 @@
+{
+  "id": "pkcs-m3c-retrieval-quality-validation",
+  "name": "pkcs-m3c-retrieval-quality-validation",
+  "title": "brainstorm: PKCS M3C retrieval quality validation and multilingual roadmap",
+  "description": "Design the post-M3B validation and long-term multilingual retrieval roadmap: expand eval coverage, compare planned retrieval quality, and define criteria for future semantic/hybrid retrieval.",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-22",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 1,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "06-16-06-16-pkcs-m3-retrieval-context-pack-design",
+  "relatedFiles": [
+    ".trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/prd.md",
+    "src/pkcs/eval/models.py",
+    "src/pkcs/eval/m3_baseline.py",
+    "src/pkcs/search/planning.py",
+    "src/pkcs/search/planned.py",
+    "tests/fixtures/m3_eval_queries.jsonl",
+    "tests/test_m3_eval.py",
+    "tests/test_planned_search.py",
+    "tests/test_context_pack.py"
+  ],
+  "notes": "M3C design started on 2026-06-22 after M3B completion. Recommended direction is eval expansion plus simple-vs-planned comparator first, with semantic/hybrid retrieval deferred until diagnostics show repeated lexical failure classes.",
+  "meta": {
+    "recommended_approach": "eval_expansion_plus_comparator_first",
+    "deferred": [
+      "machine_translation_adapter",
+      "llm_query_planner",
+      "embeddings_pgvector",
+      "reranker",
+      "language_specific_analyzers"
+    ]
+  }
+}
