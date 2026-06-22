@@ -45,7 +45,9 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "06-22-06-22-pkcs-m3a1-quality-baseline"
+  ],
   "parent": null,
   "relatedFiles": [
     ".trellis/tasks/06-16-06-16-pkcs-m3-retrieval-context-pack-design/prd.md",
@@ -55,11 +57,12 @@
     "tests/test_acceptance.py",
     "tests/test_context_pack.py"
   ],
-  "notes": "M3 design brainstorm started. User confirmed baseline-first on 2026-06-17 and pointed out baseline requires a real corpus. Plan updated to add M3A0 corpus bootstrap before M3A1 baseline metrics.",
+  "notes": "M3 design brainstorm started. User confirmed baseline-first on 2026-06-17 and pointed out baseline requires a real corpus. M3A0 corpus bootstrap and M3A1 baseline eval scaffold are now complete; next M3 work should use the baseline before changing retrieval behavior.",
   "meta": {
     "recommended_approach": "baseline-first",
     "confirmed_approach": "baseline-first",
     "confirmed_at": "2026-06-17",
-    "baseline_corpus_decision": "pending"
+    "baseline_corpus_decision": "private_m3_corpus_v1_completed",
+    "baseline_eval_scaffold": "completed_on_2026-06-22"
   }
 }

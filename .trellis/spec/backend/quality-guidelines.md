@@ -41,6 +41,7 @@ git diff --check
 | Raw Archive source reading | Docker-backed reader integration test |
 | Context Pack generation | Docker-backed Context Pack integration test |
 | Eval corpus or retrieval threshold | Docker-backed acceptance test using synthetic fixtures |
+| M3 eval schema or baseline report helper | `tests/test_m3_eval.py` plus non-private fixture rows |
 | CLI/MCP command | Interface smoke test |
 | Config key | `.env.example` update |
 | New code-spec convention | Update relevant `.trellis/spec/backend/*.md` |
@@ -88,3 +89,5 @@ For PR5, do not add Context Pack behavior; return source fragments that PR6 can 
 For PR6, do not add PR7 eval corpus or MCP client acceptance; keep it to Context Pack behavior.
 
 For PR7, keep changes to synthetic fixtures, acceptance tests, docs, and specs unless a defect in earlier MVP behavior is exposed.
+
+For M3 eval baseline work, keep report calculation separate from retrieval changes. Add query/report schema tests first, then compare later QueryRouter or fusion PRs against the baseline instead of changing ranking and metrics in the same PR.

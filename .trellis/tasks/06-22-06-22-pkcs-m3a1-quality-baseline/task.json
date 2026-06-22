@@ -1,0 +1,76 @@
+{
+  "id": "06-22-pkcs-m3a1-quality-baseline",
+  "name": "06-22-pkcs-m3a1-quality-baseline",
+  "title": "PKCS M3A1 retrieval and Context Pack quality baseline",
+  "description": "Build repeatable M3 retrieval and Context Pack quality baseline evaluation over the completed M3 corpus before changing retrieval behavior.",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-22",
+  "completedAt": "2026-06-22",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 6,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "06-16-06-16-pkcs-m3-retrieval-context-pack-design",
+  "relatedFiles": [
+    ".trellis/tasks/06-22-06-22-pkcs-m3a1-quality-baseline/prd.md",
+    ".trellis/tasks/06-22-06-22-pkcs-m3a1-quality-baseline/implementation-result.md",
+    "src/pkcs/eval/__init__.py",
+    "src/pkcs/eval/models.py",
+    "src/pkcs/eval/m3_baseline.py",
+    "tests/fixtures/m3_eval_queries.jsonl",
+    "tests/test_m3_eval.py",
+    ".trellis/spec/backend/directory-structure.md",
+    ".trellis/spec/backend/quality-guidelines.md"
+  ],
+  "notes": "Completed M3A1 baseline evaluation scaffold: M3 eval query loader/schema, baseline evaluator/report metrics, non-private query fixture, focused tests, and backend spec sync. Retrieval behavior, Context Pack selection, MCP tool names, and dependencies were unchanged.",
+  "meta": {
+    "state_sync": "2026-06-22: implementation complete and focused checks passed; Docker-backed tests not run because Docker Desktop API was unavailable.",
+    "verification": [
+      "uv run pytest tests/test_m3_eval.py tests/test_health.py tests/test_acceptance.py::test_mvp_eval_fixture_corpus_and_queries_have_required_shape -q",
+      "uv run python -m compileall -q src\\pkcs\\eval",
+      "git diff --check"
+    ],
+    "not_run": [
+      "docker compose ps postgres",
+      "uv run alembic upgrade head",
+      "uv run pytest"
+    ],
+    "not_run_reason": "Docker API connection to npipe:////./pipe/dockerDesktopLinuxEngine failed."
+  }
+}

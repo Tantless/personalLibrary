@@ -27,6 +27,9 @@ src/pkcs/
 │   ├── models.py           # SQLAlchemy ORM models
 │   ├── repositories.py     # Repository wrappers, no hidden commits
 │   └── session.py          # Engine/session factory helpers
+├── eval/
+│   ├── models.py           # Eval query and report contracts
+│   └── m3_baseline.py      # M3 search + Context Pack baseline orchestration
 ├── http/app.py             # FastAPI wiring
 ├── ingest/
 │   ├── models.py           # Ingest report/parser data contracts
@@ -56,6 +59,8 @@ src/pkcs/
 - Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
 - Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.
 - Context Pack services own retrieval orchestration, lightweight artifact hydration, and Markdown rendering; they call `SearchService` and `ReadSourceService`, and use artifact repositories only to hydrate already-selected evidence.
+- Eval modules own local query-set parsing and quality report calculation. They call `SearchService` and `ContextPackService` instead of duplicating retrieval or evidence assembly logic.
+- Eval fixtures committed under `tests/fixtures/` must be synthetic or public-reference metadata only. Private corpus source files and local baseline run outputs stay under gitignored `data/private/`.
 - Repositories write ORM objects and call `flush()`, but callers own commits.
 - Storage helpers write source bytes or copied asset bytes and return paths; they must not know database schema beyond path arguments passed in.
 
@@ -71,6 +76,7 @@ src/pkcs/
 | New search result field | Assert the field in service and interface tests |
 | New reader result field | Assert the field in service and interface tests |
 | New Context Pack field | Assert the field in service and interface tests |
+| New eval row/report field | Assert loader validation and report shape in `tests/test_m3_eval.py` |
 
 ### 5. Good/Base/Bad Cases
 
@@ -105,6 +111,9 @@ pack = ContextPackService.from_settings(settings).get_context_pack(
     top_k=top_k,
     budget_tokens=budget_tokens,
 )
+
+queries = load_m3_eval_queries(Path("tests/fixtures/m3_eval_queries.jsonl"))
+report = M3BaselineEvaluator.from_settings().evaluate(queries)
 ```
 
 Bad:
@@ -122,6 +131,7 @@ def ingest(...):
 - Search behavior: `tests/test_search.py`.
 - Reader behavior: `tests/test_reader.py`.
 - Context Pack behavior: `tests/test_context_pack.py`.
+- Eval schema and report behavior: `tests/test_m3_eval.py`.
 - Interface smoke tests: CLI and MCP tests for commands/tools that call the service.
 - Data-layer changes: `tests/test_database_schema.py` and `tests/test_repositories.py`.
 
