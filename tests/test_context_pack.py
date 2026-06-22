@@ -18,6 +18,7 @@ from pkcs.search import (
     PostgresSourceAliasProvider,
     SearchService,
 )
+from pkcs.search.models import SearchCitation, SearchResponse, SearchResult
 from pkcs.storage.raw_archive import RawArchiveWriter
 
 
@@ -168,6 +169,43 @@ def test_context_pack_no_results_returns_empty_evidence_with_caveats(db_session)
     assert response.followup_read_suggestions == []
     assert "No sources matched the query." in response.context_pack_markdown
     assert "## Conflicts / Caveats" in response.context_pack_markdown
+
+
+def test_context_pack_selection_prefers_query_supporting_evidence() -> None:
+    noise = fake_search_result(
+        result_id="noise",
+        chunk_id="noise-chunk",
+        snippet="A general Bevy overview without the expected support terms.",
+    )
+    supporting = fake_search_result(
+        result_id="supporting",
+        chunk_id="supporting-chunk",
+        snippet="Bevy is a game engine built around ECS and entity component system patterns.",
+    )
+    service = ContextPackService(
+        search_service=FakeSearchService([noise, supporting]),
+        read_source_service=FakeReadSourceService(
+            {
+                "noise-chunk": "A general Bevy overview without the expected support terms.",
+                "supporting-chunk": (
+                    "Bevy is a game engine built around ECS and entity component system patterns."
+                ),
+            }
+        ),
+        default_top_k=10,
+        max_evidence=1,
+        max_evidence_per_source=1,
+    )
+
+    response = service.get_context_pack(
+        query="哪个游戏引擎说明文档描述了实体组件系统能力？",
+        top_k=2,
+    )
+
+    assert len(response.evidence) == 1
+    assert response.evidence[0].chunk_id == "supporting-chunk"
+    assert "ECS" in response.evidence[0].content
+    assert "query-aware lexical support" in response.retrieval_plan["selection"]
 
 
 def test_context_pack_uses_planned_search_for_mixed_language_query(db_session, tmp_path) -> None:
@@ -325,3 +363,48 @@ async def test_mcp_get_context_pack_tool_smoke(monkeypatch, migrated_database_ur
     body = json.loads(result[0].text)
     assert body["evidence"]
     assert body["context_pack_markdown"].startswith("# Context Pack")
+
+
+class FakeSearchService:
+    def __init__(self, results: list[SearchResult]) -> None:
+        self.results = results
+
+    def search_knowledge(self, *, query, knowledge_type=None, canonical_key=None, top_k=None):
+        return SearchResponse(
+            query=query,
+            knowledge_type=knowledge_type,
+            canonical_key=canonical_key,
+            top_k=top_k or 10,
+            results=self.results,
+        )
+
+
+class FakeReadSourceService:
+    def __init__(self, content_by_chunk_id: dict[str, str]) -> None:
+        self.content_by_chunk_id = content_by_chunk_id
+
+    def read_source(self, *, chunk_id, source_id=None, version_id=None, locator=None, context_lines=0):
+        return FakeSourceFragment(content=self.content_by_chunk_id[chunk_id])
+
+
+class FakeSourceFragment:
+    def __init__(self, *, content: str) -> None:
+        self.content = content
+
+
+def fake_search_result(*, result_id: str, chunk_id: str, snippet: str) -> SearchResult:
+    return SearchResult(
+        result_id=result_id,
+        chunk_id=chunk_id,
+        source_id="bevy-source",
+        version_id="bevy-version",
+        canonical_key="m3-corpus:game:bevy-readme",
+        title="Bevy README",
+        source_format="md",
+        normalized_format="md",
+        knowledge_type="document",
+        snippet=snippet,
+        score=1.0,
+        citation=SearchCitation(locator="line 1-2", line_start=1, line_end=2),
+        metadata={},
+    )

@@ -35,8 +35,16 @@ DEFAULT_TECHNICAL_GLOSSARY: dict[str, tuple[str, ...]] = {
     "追踪": ("tracing", "workflow", "observability"),
     "工作流事件": ("workflow", "events", "tracing"),
     "核心能力": ("features", "capabilities"),
+    "能力": ("features", "capabilities"),
+    "实体组件系统": ("ECS", "entity component system"),
+    "游戏引擎": ("game engine",),
+    "说明文档": ("README", "docs", "documentation"),
     "重点": ("overview", "highlights"),
     "文档": ("docs", "documentation"),
+    "日本动画行业": ("Anime Industry Report", "AJA", "Industry Report"),
+    "动画行业": ("Anime Industry Report", "Industry Report"),
+    "行业报告": ("Industry Report", "Anime Industry Report"),
+    "报告": ("report", "summary"),
 }
 
 SOURCE_ALIAS_STOPWORDS = {
@@ -131,6 +139,25 @@ def source_alias_from_metadata(*, title: str, canonical_key: str | None = None) 
         aliases=tuple(aliases),
         terms=tuple(terms),
         canonical_key=canonical_key,
+    )
+
+
+def query_signal_terms(
+    query: str,
+    glossary: dict[str, tuple[str, ...]] | None = None,
+) -> list[str]:
+    normalized_query = _normalize_query(query)
+    resolved_glossary = DEFAULT_TECHNICAL_GLOSSARY if glossary is None else glossary
+    glossary_matches = _expand_glossary(normalized_query, resolved_glossary)
+    return _unique_terms(
+        [
+            *_extract_ascii_entities(normalized_query),
+            *(
+                term
+                for expansions in glossary_matches.values()
+                for term in expansions
+            ),
+        ]
     )
 
 

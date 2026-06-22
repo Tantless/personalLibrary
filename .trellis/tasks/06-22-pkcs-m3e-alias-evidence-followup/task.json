@@ -1,0 +1,91 @@
+{
+  "id": "pkcs-m3e-alias-evidence-followup",
+  "name": "pkcs-m3e-alias-evidence-followup",
+  "title": "PKCS M3E targeted alias and evidence selection follow-up",
+  "description": "Target the two M3D diagnostic failures: Chinese source alias recall and Context Pack evidence selection.",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-22",
+  "completedAt": "2026-06-22",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 6,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "06-16-06-16-pkcs-m3-retrieval-context-pack-design",
+  "relatedFiles": [
+    ".trellis/tasks/06-22-pkcs-m3e-alias-evidence-followup/prd.md",
+    ".trellis/tasks/06-22-pkcs-m3e-alias-evidence-followup/m3e-alias-evidence-report.md",
+    ".trellis/tasks/06-22-pkcs-m3d-diagnostic-query-set/m3d-diagnostic-report.md",
+    "src/pkcs/search/planning.py",
+    "src/pkcs/context_pack/service.py",
+    "tests/test_search_planning.py",
+    "tests/test_context_pack.py",
+    "tests/test_m3_eval.py",
+    "tests/fixtures/m3_diagnostic_queries.jsonl",
+    ".trellis/spec/backend/directory-structure.md",
+    ".trellis/spec/backend/database-guidelines.md",
+    ".trellis/spec/backend/quality-guidelines.md"
+  ],
+  "notes": "M3E completed on 2026-06-22. Implemented deterministic glossary/query-signal expansion and query-aware Context Pack evidence selection to fix the two M3D diagnostic failures. Generated private report at data/private/eval-runs/m3e-alias-evidence-20260622.json: planned_top_10_hit_rate=1.0, planned_context_support_rate=1.0, locked_regression_pass_rate=1.0, and all M3 failure classes are 0.",
+  "meta": {
+    "source_task": "06-22-pkcs-m3d-diagnostic-query-set",
+    "latest_private_report": "data/private/eval-runs/m3e-alias-evidence-20260622.json",
+    "report_summary": {
+      "query_count": 28,
+      "simple_top_10_hit_rate": 0.1071,
+      "planned_top_10_hit_rate": 1.0,
+      "planned_context_support_rate": 1.0,
+      "locked_regression_pass_rate": 1.0,
+      "context_support_miss_count": 0
+    },
+    "failure_classes": {
+      "evidence_selection_gap": 0,
+      "missing_alias": 0,
+      "missing_glossary": 0,
+      "semantic_gap": 0
+    },
+    "next_pr_sized_step": "M3F diagnostic trend gate or expanded diagnostics",
+    "deferred": [
+      "machine_translation_adapter",
+      "llm_query_planner",
+      "embeddings_pgvector",
+      "reranker",
+      "language_specific_analyzers"
+    ]
+  }
+}

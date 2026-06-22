@@ -61,7 +61,8 @@ src/pkcs/
 - Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
 - PostgreSQL FTS search includes `sources.title` alongside chunk title/content so source-alias queries can recover chunks whose local chunk headings omit the source title.
 - Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.
-- Context Pack services own retrieval orchestration, lightweight artifact hydration, and Markdown rendering; the default settings path uses `PlannedSearchService` plus `ReadSourceService`, and tests may still inject `SearchService` for simple-search coverage. Context Pack code uses artifact repositories only to hydrate already-selected evidence.
+- Context Pack services own retrieval orchestration, query-aware evidence selection, lightweight artifact hydration, and Markdown rendering; the default settings path uses `PlannedSearchService` plus `ReadSourceService`, and tests may still inject `SearchService` for simple-search coverage. Context Pack code uses artifact repositories only to hydrate already-selected evidence.
+- Context Pack evidence selection ranks the search top_k candidates by deterministic lexical support for query signal terms, then applies chunk deduplication, per-source cap, and evidence cap. It must not read Raw Archive content before selecting candidates.
 - Eval modules own local query-set parsing and quality report calculation. They call `SearchService` and `ContextPackService` instead of duplicating retrieval or evidence assembly logic.
 - M3 eval schema v2 rows may add `suite`, `language`, `query_style`, `expected_intent`, `expected_pass_names`, and `diagnostic_tags`; old rows must keep loading, default `suite` to `locked_regression`, and default `expected_intent` to `query_type`.
 - M3 comparison reports compare `simple_search`, `planned_search`, and `planned_context_pack`; pass diagnostics must be derived from `planned_retrieval.pass_hits` and planned `pass_runs`, not from hard-coded eval query text.
@@ -88,7 +89,7 @@ src/pkcs/
 | New planned search fusion behavior | Assert source-title matching, pass runs, fused result metadata, and pass-error continuation in `tests/test_planned_search.py` |
 | New reader result field | Assert the field in service and interface tests |
 | New Context Pack field | Assert the field in service and interface tests |
-| New Context Pack retrieval path | Assert `retrieval_plan.query_plan`, `retrieval_plan.pass_runs`, evidence traceability, and Markdown retrieval summary in `tests/test_context_pack.py` |
+| New Context Pack retrieval path | Assert `retrieval_plan.query_plan`, `retrieval_plan.pass_runs`, evidence traceability, selection strategy, and Markdown retrieval summary in `tests/test_context_pack.py` |
 | New eval row/report field | Assert loader validation and report shape in `tests/test_m3_eval.py` |
 
 ### 5. Good/Base/Bad Cases

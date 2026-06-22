@@ -13,6 +13,7 @@ from pkcs.db.repositories import ImageArtifactRepository, TableArtifactRepositor
 from pkcs.reader import ReadSourceService
 from pkcs.search import PlannedSearchService, SearchService
 from pkcs.search.models import SearchResult
+from pkcs.search.planning import query_signal_terms
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,10 @@ class ContextPackService:
             canonical_key=canonical_key,
             top_k=search_top_k,
         )
-        selected_results = self._select_evidence(search_response.results)
+        selected_results = self._select_evidence(
+            query=normalized_query,
+            results=search_response.results,
+        )
         evidence = self._read_evidence(selected_results)
         sources = self._build_sources(evidence)
         followups = self._build_followups(evidence)
@@ -123,7 +127,7 @@ class ContextPackService:
             "max_evidence_per_source": self.max_evidence_per_source,
             "budget_tokens": budget_tokens,
             "budget_is_soft_limit": True,
-            "selection": "search_top_k + chunk deduplication + per-source evidence cap",
+            "selection": "query-aware lexical support + chunk deduplication + per-source evidence cap",
             "conflict_detection": "not_performed_in_mvp",
         }
         if query_plan is not None:
@@ -133,12 +137,13 @@ class ContextPackService:
             retrieval_plan["pass_runs"] = [item.to_dict() for item in pass_runs]
         return retrieval_plan
 
-    def _select_evidence(self, results: list[SearchResult]) -> list[SearchResult]:
+    def _select_evidence(self, *, query: str, results: list[SearchResult]) -> list[SearchResult]:
         selected: list[SearchResult] = []
         seen_chunks: set[str] = set()
         per_source: Counter[str] = Counter()
+        ranked_results = _rank_evidence_candidates(query=query, results=results)
 
-        for result in results:
+        for result in ranked_results:
             if result.chunk_id in seen_chunks:
                 continue
             if per_source[result.source_id] >= self.max_evidence_per_source:
@@ -396,3 +401,35 @@ class ContextPackService:
 
     def _estimate_tokens(self, text: str) -> int:
         return max(1, len(text) // 4)
+
+
+def _rank_evidence_candidates(*, query: str, results: list[SearchResult]) -> list[SearchResult]:
+    terms = query_signal_terms(query)
+    if not terms:
+        return results
+    return [
+        result
+        for _, result in sorted(
+            enumerate(results),
+            key=lambda item: (-_evidence_support_score(item[1], terms), item[0]),
+        )
+    ]
+
+
+def _evidence_support_score(result: SearchResult, terms: list[str]) -> int:
+    haystack = "\n".join(
+        [
+            result.title,
+            result.canonical_key,
+            result.snippet,
+        ]
+    ).casefold()
+    score = 0
+    for term in terms:
+        normalized = term.strip()
+        if len(normalized) < 2:
+            continue
+        if normalized.casefold() not in haystack:
+            continue
+        score += 2 if " " in normalized else 1
+    return score

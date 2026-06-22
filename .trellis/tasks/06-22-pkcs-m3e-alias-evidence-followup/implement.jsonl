@@ -1,0 +1,6 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis\\spec\\backend\\directory-structure.md", "reason": "Backend service ownership and retrieval planning/context pack contracts"}
+{"file": ".trellis\\spec\\backend\\quality-guidelines.md", "reason": "Backend verification and M3 retrieval dependency constraints"}
+{"file": ".trellis\\spec\\guides\\code-reuse-thinking-guide.md", "reason": "Modify existing planner/context pack helpers instead of duplicating logic"}
+{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "Retrieval result metadata flows into Context Pack selection and eval reports"}

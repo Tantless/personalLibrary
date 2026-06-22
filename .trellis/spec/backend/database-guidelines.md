@@ -163,7 +163,7 @@ Context Pack:
 
 - Context Pack must call `SearchService` for candidate evidence and `ReadSourceService` for source fragments.
 - Every Context Pack evidence item must carry `chunk_id`, `source_id`, `version_id`, `canonical_key`, `locator`, `line_start`, and `line_end`.
-- Evidence selection is search top_k plus chunk deduplication and per-source evidence cap.
+- Evidence selection ranks the search top_k candidates by deterministic lexical support for query signal terms, then applies chunk deduplication, per-source evidence cap, and evidence cap. It must not read Raw Archive content before selecting candidates.
 - If a narrative chunk has `metadata_json.linked_artifacts`, Context Pack may hydrate Level 1 artifact summaries by resolving `artifact_type + artifact_id` through the artifact repositories.
 - If an artifact-derived chunk has `metadata_json.artifact_type` and `metadata_json.artifact_id`, Context Pack may append object details while preserving the Raw Archive fragment returned by `ReadSourceService`.
 - `budget_tokens` only affects `context_pack_markdown`; it is a soft hint and not an exact tokenizer guarantee.

@@ -61,6 +61,29 @@ def test_query_planner_handles_gpt5_safety_query() -> None:
     assert "safety evaluations" in pass_query(plan, PASS_GLOSSARY_EXPANSION)
 
 
+def test_query_planner_bridges_chinese_anime_industry_report_query() -> None:
+    planner = QueryPlanner(source_aliases=m3_source_aliases())
+
+    plan = planner.plan("哪份报告总结了日本动画行业 2025 年的数据？")
+
+    assert plan.intent == "broad_recall"
+    assert pass_query(plan, PASS_ASCII_ENTITY) == "2025"
+    assert "Anime Industry Report" in pass_query(plan, PASS_GLOSSARY_EXPANSION)
+    assert pass_query(plan, PASS_SOURCE_ALIAS) == "AJA Anime Industry Report 2025 Summary"
+    assert pass_canonical_keys(plan) == ["m3-corpus:anime:aja-anime-industry-report-2025-summary"]
+
+
+def test_query_planner_bridges_chinese_ecs_game_engine_query() -> None:
+    planner = QueryPlanner(source_aliases=m3_source_aliases())
+
+    plan = planner.plan("哪个游戏引擎说明文档描述了实体组件系统能力？")
+
+    assert "ECS" in pass_query(plan, PASS_GLOSSARY_EXPANSION)
+    assert "game engine" in pass_query(plan, PASS_GLOSSARY_EXPANSION)
+    assert pass_query(plan, PASS_SOURCE_ALIAS) == "Bevy README"
+    assert pass_canonical_keys(plan) == ["m3-corpus:game:bevy-readme"]
+
+
 def test_query_planner_falls_back_to_original_for_unstructured_query() -> None:
     plan = QueryPlanner().plan("这段材料讲了什么？")
 
@@ -161,6 +184,18 @@ def m3_source_aliases() -> list[SourceAlias]:
             canonical_key="m3-corpus:game:bevy-readme",
             aliases=("Bevy README", "Bevy", "README"),
             terms=("ECS", "game engine", "features", "capabilities"),
+        ),
+        SourceAlias(
+            title="AJA Anime Industry Report 2025 Summary",
+            canonical_key="m3-corpus:anime:aja-anime-industry-report-2025-summary",
+            aliases=("AJA Anime Industry Report", "Anime Industry Report"),
+            terms=("AJA", "Anime", "Industry", "Report", "2025", "Summary"),
+        ),
+        SourceAlias(
+            title="AJA Japan Anime Data",
+            canonical_key="m3-corpus:anime:aja-japan-anime-data",
+            aliases=("Japan Anime Data", "AJA"),
+            terms=("AJA", "Japan", "Anime", "Data"),
         ),
         SourceAlias(
             title="NVIDIA DiffusionGemma documentation",
