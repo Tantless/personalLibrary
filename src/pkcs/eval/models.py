@@ -18,6 +18,16 @@ M3_EVAL_SUITE_VALUES = {
     M3_EVAL_SUITE_LOCKED_REGRESSION,
     M3_EVAL_SUITE_PRIVATE_DIAGNOSTIC,
 }
+M3_FAILURE_EVIDENCE_SELECTION_GAP = "evidence_selection_gap"
+M3_FAILURE_MISSING_ALIAS = "missing_alias"
+M3_FAILURE_MISSING_GLOSSARY = "missing_glossary"
+M3_FAILURE_SEMANTIC_GAP = "semantic_gap"
+M3_FAILURE_CLASSES = {
+    M3_FAILURE_EVIDENCE_SELECTION_GAP,
+    M3_FAILURE_MISSING_ALIAS,
+    M3_FAILURE_MISSING_GLOSSARY,
+    M3_FAILURE_SEMANTIC_GAP,
+}
 
 
 class M3EvalInputError(ValueError):
@@ -186,6 +196,127 @@ class M3EvalReport:
             "context_top_k": self.context_top_k,
             "context_budget_tokens": self.context_budget_tokens,
             "summary": self.summary.to_dict(),
+            "results": [result.to_dict() for result in self.results],
+        }
+
+
+@dataclass(frozen=True)
+class M3ComparisonPassDiagnostics:
+    pass_result_counts: dict[str, int]
+    pass_error_types: dict[str, str]
+    expected_source_pass_names: list[str]
+    missing_expected_pass_names: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class M3ResultDistribution:
+    result_count: int
+    distinct_canonical_key_count: int
+    dominant_canonical_key: str | None
+    dominant_canonical_key_count: int
+    dominant_canonical_key_share: float
+    unexpected_result_count: int
+    unexpected_result_ratio: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class M3ComparisonQueryResult:
+    query: str
+    query_type: str
+    suite: str
+    language: str | None
+    query_style: str | None
+    expected_intent: str | None
+    expected_canonical_keys: list[str]
+    diagnostic_tags: list[str]
+    simple_search: M3SearchQuality
+    planned_search: M3SearchQuality
+    planned_context_pack: M3ContextPackQuality
+    pass_diagnostics: M3ComparisonPassDiagnostics
+    planned_result_distribution: M3ResultDistribution
+    failure_classes: list[str]
+    notes: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "query": self.query,
+            "query_type": self.query_type,
+            "suite": self.suite,
+            "language": self.language,
+            "query_style": self.query_style,
+            "expected_intent": self.expected_intent,
+            "expected_canonical_keys": self.expected_canonical_keys,
+            "diagnostic_tags": self.diagnostic_tags,
+            "simple_search": self.simple_search.to_dict(),
+            "planned_search": self.planned_search.to_dict(),
+            "planned_context_pack": self.planned_context_pack.to_dict(),
+            "pass_diagnostics": self.pass_diagnostics.to_dict(),
+            "planned_result_distribution": self.planned_result_distribution.to_dict(),
+            "failure_classes": self.failure_classes,
+            "notes": self.notes,
+        }
+
+
+@dataclass(frozen=True)
+class M3ComparisonSummary:
+    query_count: int
+    simple_top_10_hit_rate: float
+    planned_top_10_hit_rate: float
+    simple_to_planned_top_10_delta: float
+    planned_context_support_rate: float
+    locked_regression_query_count: int
+    locked_regression_pass_rate: float
+    planned_empty_result_count: int
+    context_support_miss_count: int
+    noisy_result_query_count: int
+    source_concentration_query_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class M3ComparisonPassSummary:
+    original_hit_count: int
+    ascii_entity_hit_count: int
+    glossary_hit_count: int
+    source_alias_hit_count: int
+    combined_hit_count: int
+    pass_result_counts: dict[str, int]
+    pass_error_counts: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class M3ComparisonReport:
+    suite: str
+    generated_at: str
+    search_top_k: int
+    context_top_k: int
+    context_budget_tokens: int | None
+    summary: M3ComparisonSummary
+    pass_diagnostics: M3ComparisonPassSummary
+    failure_classes: dict[str, int]
+    results: list[M3ComparisonQueryResult]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "suite": self.suite,
+            "generated_at": self.generated_at,
+            "search_top_k": self.search_top_k,
+            "context_top_k": self.context_top_k,
+            "context_budget_tokens": self.context_budget_tokens,
+            "summary": self.summary.to_dict(),
+            "pass_diagnostics": self.pass_diagnostics.to_dict(),
+            "failure_classes": self.failure_classes,
             "results": [result.to_dict() for result in self.results],
         }
 

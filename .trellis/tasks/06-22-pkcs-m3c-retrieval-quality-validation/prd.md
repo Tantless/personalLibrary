@@ -269,6 +269,15 @@ Verification:
 * Fake service tests prove summary math and failure classification.
 * Real local M3 corpus smoke can generate private JSON report.
 
+Status on 2026-06-22:
+
+* Implemented locally in PR2: `M3ComparisonEvaluator` compares simple search, planned search, and planned Context Pack for each eval row.
+* Added comparison report models with summary rates, locked regression pass rate, pass diagnostics, failure class counts, noisy result counts, source concentration counts, and per-query result details.
+* Added `write_m3_comparison_report()` for local JSON output under gitignored `data/private/eval-runs/`.
+* Added fake-service tests for simple-vs-planned deltas, pass hit diagnostics, pass error counts, missing alias/glossary classes, evidence selection gap, noisy/source-concentrated results, and JSON writing.
+* Generated private smoke report at `data/private/eval-runs/m3c-comparison-pr2-20260622.json`; current 6 locked regression rows report `planned_top_10_hit_rate=1.0`, `planned_context_support_rate=1.0`, and `simple_top_10_hit_rate=0.0`.
+* Verified with `uv run pytest tests\test_m3_eval.py tests\test_planned_search.py tests\test_context_pack.py -q`, `uv run alembic upgrade head`, `uv run pytest`, and `git diff --check`.
+
 ### PR3: Multilingual roadmap ADR and follow-up handoff
 
 * Record entry criteria for translation adapter vs semantic/hybrid retrieval.

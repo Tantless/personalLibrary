@@ -61,12 +61,14 @@
     ".trellis/spec/backend/directory-structure.md",
     ".trellis/spec/backend/quality-guidelines.md"
   ],
-  "notes": "M3C design started on 2026-06-22 after M3B completion. User selected MVP option 2: implement eval schema v2 plus simple-vs-planned comparator/report first, and defer the first expanded diagnostic query set to a follow-up task. Semantic/hybrid retrieval remains deferred until diagnostics show repeated lexical failure classes. PR1 schema v2 is implemented and verified: optional diagnostic metadata is accepted, v1 rows default to locked_regression, and tests cover compatibility and validation.",
+  "notes": "M3C design started on 2026-06-22 after M3B completion. User selected MVP option 2: implement eval schema v2 plus simple-vs-planned comparator/report first, and defer the first expanded diagnostic query set to a follow-up task. Semantic/hybrid retrieval remains deferred until diagnostics show repeated lexical failure classes. PR1 schema v2 is implemented and verified. PR2 comparison report is implemented and verified: it compares simple search, planned search, and planned Context Pack, reports pass diagnostics and failure classes, and generated a private smoke report at data/private/eval-runs/m3c-comparison-pr2-20260622.json.",
   "meta": {
     "recommended_approach": "eval_expansion_plus_comparator_first",
     "confirmed_approach": "schema_and_comparator_first",
     "confirmed_at": "2026-06-22",
     "mvp_includes_expanded_diagnostic_queries": false,
+    "latest_private_report": "data/private/eval-runs/m3c-comparison-pr2-20260622.json",
+    "next_pr_sized_step": "PR3 multilingual roadmap ADR and M3D handoff",
     "follow_up": "first_expanded_diagnostic_query_set",
     "deferred": [
       "first_expanded_diagnostic_query_set",

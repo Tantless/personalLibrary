@@ -93,3 +93,5 @@ For PR7, keep changes to synthetic fixtures, acceptance tests, docs, and specs u
 For M3 eval baseline work, keep report calculation separate from retrieval changes. Add query/report schema tests first, then compare later QueryRouter or fusion PRs against the baseline instead of changing ranking and metrics in the same PR.
 
 For M3C eval schema work, keep v1 fixture rows backward-compatible and validate v2 diagnostic metadata in `tests/test_m3_eval.py` without adding expanded diagnostic queries or changing retrieval behavior in the same PR.
+
+For M3C comparison report work, use fake service tests for summary math, pass diagnostics, failure classes, noisy result counts, source concentration counts, and JSON writing. Do not change `SearchService`, `PlannedSearchService`, planner rules, or Context Pack selection in the comparison-report PR.
