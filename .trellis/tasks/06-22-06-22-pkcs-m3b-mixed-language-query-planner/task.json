@@ -3,7 +3,7 @@
   "name": "06-22-pkcs-m3b-mixed-language-query-planner",
   "title": "brainstorm: PKCS M3B mixed-language query planner",
   "description": "Plan M3B query planning and multi-pass lexical retrieval for mixed-language queries before implementing retrieval behavior changes.",
-  "status": "planning",
+  "status": "in-progress",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 1,
+  "current_phase": 4,
   "next_action": [
     {
       "phase": 1,
@@ -53,9 +53,12 @@
     "src/pkcs/eval/m3_baseline.py",
     "tests/fixtures/m3_eval_queries.jsonl",
     "src/pkcs/search/",
-    "src/pkcs/context_pack/"
+    "src/pkcs/context_pack/",
+    "src/pkcs/search/planning.py",
+    "tests/test_search_planning.py",
+    ".trellis/spec/backend/directory-structure.md"
   ],
-  "notes": "M3B planning scope confirmed by user on 2026-06-22. M3A1 baseline shows Chinese natural no-marker queries produce 6/6 empty results against mostly English corpus content, while English title-style smoke queries hit expected sources. M3B MVP will implement deterministic query planning plus multi-pass lexical retrieval/fusion only; semantic/vector search, translation, LLM planning, and reranking are deferred.",
+  "notes": "M3B planning scope confirmed by user on 2026-06-22. M3A1 baseline shows Chinese natural no-marker queries produce 6/6 empty results against mostly English corpus content, while English title-style smoke queries hit expected sources. M3B MVP will implement deterministic query planning plus multi-pass lexical retrieval/fusion only; semantic/vector search, translation, LLM planning, and reranking are deferred. PR1 planner contracts and deterministic planning were implemented on 2026-06-22; PR2 multi-pass retrieval/fusion is still pending.",
   "meta": {
     "recommended_approach": "deterministic_lexical_planner_first",
     "confirmed_approach": "deterministic_lexical_planner_first",

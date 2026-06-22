@@ -43,6 +43,7 @@ src/pkcs/
 │   └── service.py          # Raw Archive backed source fragment reading
 ├── search/
 │   ├── models.py           # Search response/result contracts
+│   ├── planning.py         # RetrievalPlan contracts and deterministic query planning
 │   ├── providers.py        # SearchProvider abstraction and PostgreSQL FTS provider
 │   └── service.py          # Search application workflow
 └── storage/raw_archive.py  # Raw Archive filesystem writes
@@ -61,6 +62,8 @@ src/pkcs/
 - Context Pack services own retrieval orchestration, lightweight artifact hydration, and Markdown rendering; they call `SearchService` and `ReadSourceService`, and use artifact repositories only to hydrate already-selected evidence.
 - Eval modules own local query-set parsing and quality report calculation. They call `SearchService` and `ContextPackService` instead of duplicating retrieval or evidence assembly logic.
 - Eval fixtures committed under `tests/fixtures/` must be synthetic or public-reference metadata only. Private corpus source files and local baseline run outputs stay under gitignored `data/private/`.
+- Retrieval planning belongs in `src/pkcs/search/planning.py`. It converts a user query into a `RetrievalPlan` with named passes, intent, fusion method, and debug metadata; it must not execute search SQL or read/write database rows.
+- Deterministic query planning may use reusable entity extraction, glossary terms, and source aliases, but must not map whole eval questions directly to source-specific queries.
 - Repositories write ORM objects and call `flush()`, but callers own commits.
 - Storage helpers write source bytes or copied asset bytes and return paths; they must not know database schema beyond path arguments passed in.
 
@@ -74,6 +77,7 @@ src/pkcs/
 | New artifact-aware ingest behavior | Assert parser/service metadata links, artifact rows, and Context Pack hydration |
 | New cross-layer report field | Assert the field in service and interface tests |
 | New search result field | Assert the field in service and interface tests |
+| New retrieval planning pass or plan field | Assert pass names, query strings, intent fallback, and serialized shape in `tests/test_search_planning.py` |
 | New reader result field | Assert the field in service and interface tests |
 | New Context Pack field | Assert the field in service and interface tests |
 | New eval row/report field | Assert loader validation and report shape in `tests/test_m3_eval.py` |
@@ -114,6 +118,8 @@ pack = ContextPackService.from_settings(settings).get_context_pack(
 
 queries = load_m3_eval_queries(Path("tests/fixtures/m3_eval_queries.jsonl"))
 report = M3BaselineEvaluator.from_settings().evaluate(queries)
+
+plan = QueryPlanner(source_aliases=source_aliases).plan(query)
 ```
 
 Bad:
@@ -129,6 +135,7 @@ def ingest(...):
 
 - Shared service behavior: `tests/test_ingest.py`.
 - Search behavior: `tests/test_search.py`.
+- Retrieval planning behavior: `tests/test_search_planning.py`.
 - Reader behavior: `tests/test_reader.py`.
 - Context Pack behavior: `tests/test_context_pack.py`.
 - Eval schema and report behavior: `tests/test_m3_eval.py`.

@@ -43,8 +43,8 @@
 
 ## Acceptance Criteria (evolving)
 
-* [ ] M3B 设计明确 `RetrievalPlan` 和 `RetrievalPass` 的字段。
-* [ ] M3B 设计明确 first-pass lexical planner 的规则来源：entity extractor、glossary、source alias。
+* [x] M3B 设计明确 `RetrievalPlan` 和 `RetrievalPass` 的字段。
+* [x] M3B 设计明确 first-pass lexical planner 的规则来源：entity extractor、glossary、source alias。
 * [ ] M3B 设计明确 fusion 方法和去重 key。
 * [ ] M3B 设计明确哪些功能延期到 semantic/vector 阶段。
 * [x] 用户确认 M3B MVP 范围。
@@ -246,6 +246,12 @@ Exclude:
 Verification:
 
 * Planner tests assert pass names, query strings, intent fallback, and no whole-query hardcoding.
+
+Status:
+
+* Completed on 2026-06-22 in `src/pkcs/search/planning.py`.
+* Tests added in `tests/test_search_planning.py`.
+* This PR-sized step does not execute multi-pass search yet; PR2 will wire planned passes into retrieval and fusion.
 
 ### PR2: Multi-pass lexical retrieval and fusion
 
