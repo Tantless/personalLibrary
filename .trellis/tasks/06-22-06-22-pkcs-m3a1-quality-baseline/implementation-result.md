@@ -21,7 +21,7 @@ uv run python -m compileall -q src\pkcs\eval
 git diff --check
 ```
 
-Not run:
+Post-Docker validation on 2026-06-22:
 
 ```text
 docker compose ps postgres
@@ -29,7 +29,28 @@ uv run alembic upgrade head
 uv run pytest
 ```
 
-Reason: Docker Desktop was unavailable; Docker API connection failed for `npipe:////./pipe/dockerDesktopLinuxEngine`.
+Result: PostgreSQL healthy, Alembic at head, full pytest passed with 66 passed and 1 warning.
+
+## Baseline Run
+
+Generated a private local report:
+
+```text
+data/private/eval-runs/m3a1-baseline-20260622-093935.json
+```
+
+Summary:
+
+* query_count: 6
+* top_1_hit_rate: 0.0
+* top_5_hit_rate: 0.0
+* top_10_hit_rate: 0.0
+* context_support_rate: 0.0
+* traceability_rate: 1.0
+* caveats_rate: 1.0
+* empty_result_count: 6
+
+Interpretation: the committed M3 eval fixture uses Chinese natural questions over mostly English corpus content. Current PostgreSQL `simple` FTS returns empty results for these mixed-language questions. English title-style smoke queries still hit the expected M3 corpus sources, so the corpus is searchable; M3B should treat Chinese/no-marker query normalization or keyword extraction as a first-class router/fusion requirement.
 
 ## Scope Notes
 

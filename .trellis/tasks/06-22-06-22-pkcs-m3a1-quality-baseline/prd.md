@@ -82,3 +82,15 @@ git diff --check
 ```
 
 Docker-backed tests were not run because Docker Desktop was unavailable: Docker API connection to `npipe:////./pipe/dockerDesktopLinuxEngine` failed.
+
+Docker-backed validation was rerun after Docker Desktop became available:
+
+```text
+docker compose ps postgres
+uv run alembic upgrade head
+uv run pytest
+```
+
+Result: PostgreSQL healthy, Alembic at head, full pytest passed with 66 passed and 1 warning.
+
+Baseline report generated at `data/private/eval-runs/m3a1-baseline-20260622-093935.json`. The report recorded 6/6 empty results for Chinese natural questions; English title-style smoke queries still hit expected corpus sources. This establishes a concrete M3B target: query normalization/keyword extraction for Chinese or mixed-language questions before or during lexical retrieval.

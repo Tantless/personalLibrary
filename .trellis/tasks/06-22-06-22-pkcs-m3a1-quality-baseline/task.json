@@ -58,19 +58,29 @@
     ".trellis/spec/backend/directory-structure.md",
     ".trellis/spec/backend/quality-guidelines.md"
   ],
-  "notes": "Completed M3A1 baseline evaluation scaffold: M3 eval query loader/schema, baseline evaluator/report metrics, non-private query fixture, focused tests, and backend spec sync. Retrieval behavior, Context Pack selection, MCP tool names, and dependencies were unchanged.",
+  "notes": "Completed M3A1 baseline evaluation scaffold: M3 eval query loader/schema, baseline evaluator/report metrics, non-private query fixture, focused tests, backend spec sync, and post-Docker validation. Retrieval behavior, Context Pack selection, MCP tool names, and dependencies were unchanged.",
   "meta": {
-    "state_sync": "2026-06-22: implementation complete and focused checks passed; Docker-backed tests not run because Docker Desktop API was unavailable.",
+    "state_sync": "2026-06-22: implementation complete; focused checks and full Docker-backed pytest passed after Docker Desktop became available.",
     "verification": [
       "uv run pytest tests/test_m3_eval.py tests/test_health.py tests/test_acceptance.py::test_mvp_eval_fixture_corpus_and_queries_have_required_shape -q",
       "uv run python -m compileall -q src\\pkcs\\eval",
-      "git diff --check"
-    ],
-    "not_run": [
+      "git diff --check",
       "docker compose ps postgres",
       "uv run alembic upgrade head",
       "uv run pytest"
     ],
-    "not_run_reason": "Docker API connection to npipe:////./pipe/dockerDesktopLinuxEngine failed."
+    "docker_validation_result": "66 passed, 1 warning",
+    "baseline_report": "data/private/eval-runs/m3a1-baseline-20260622-093935.json",
+    "baseline_summary": {
+      "query_count": 6,
+      "top_1_hit_rate": 0.0,
+      "top_5_hit_rate": 0.0,
+      "top_10_hit_rate": 0.0,
+      "context_support_rate": 0.0,
+      "traceability_rate": 1.0,
+      "caveats_rate": 1.0,
+      "empty_result_count": 6
+    },
+    "baseline_observation": "Chinese natural questions over mostly English corpus content currently return empty results with PostgreSQL simple FTS; English title-style smoke queries hit expected sources."
   }
 }
