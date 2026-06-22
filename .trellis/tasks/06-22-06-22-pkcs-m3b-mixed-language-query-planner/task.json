@@ -55,9 +55,17 @@
     "src/pkcs/search/",
     "src/pkcs/context_pack/"
   ],
-  "notes": "M3B planning started. M3A1 baseline shows Chinese natural no-marker queries produce 6/6 empty results against mostly English corpus content, while English title-style smoke queries hit expected sources. Recommended M3B MVP is deterministic query planning plus multi-pass lexical retrieval/fusion, with semantic/vector search deferred.",
+  "notes": "M3B planning scope confirmed by user on 2026-06-22. M3A1 baseline shows Chinese natural no-marker queries produce 6/6 empty results against mostly English corpus content, while English title-style smoke queries hit expected sources. M3B MVP will implement deterministic query planning plus multi-pass lexical retrieval/fusion only; semantic/vector search, translation, LLM planning, and reranking are deferred.",
   "meta": {
     "recommended_approach": "deterministic_lexical_planner_first",
-    "open_question": "Whether M3B MVP should only implement deterministic lexical planning, or also reserve a disabled translation pass adapter."
+    "confirmed_approach": "deterministic_lexical_planner_first",
+    "confirmed_at": "2026-06-22",
+    "deferred": [
+      "machine_translation_adapter",
+      "llm_query_planner",
+      "embeddings_pgvector",
+      "reranker",
+      "language_specific_analyzers"
+    ]
   }
 }

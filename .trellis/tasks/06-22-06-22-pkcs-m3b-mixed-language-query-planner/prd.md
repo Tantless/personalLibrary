@@ -47,7 +47,7 @@
 * [ ] M3B 设计明确 first-pass lexical planner 的规则来源：entity extractor、glossary、source alias。
 * [ ] M3B 设计明确 fusion 方法和去重 key。
 * [ ] M3B 设计明确哪些功能延期到 semantic/vector 阶段。
-* [ ] 用户确认 M3B MVP 范围。
+* [x] 用户确认 M3B MVP 范围。
 * [ ] 实现阶段必须跑 M3A1 baseline，对比 top_10 hit / context_support / empty_result_count。
 
 ## Technical Approach
@@ -130,6 +130,10 @@ Cons:
 * Not a complete cross-language solution.
 * Needs small curated terminology for current corpus.
 * Japanese/general multilingual recall remains limited until semantic retrieval.
+
+Status:
+
+* Selected by user on 2026-06-22. M3B MVP will implement Approach A only.
 
 ### Approach B: Add query-only translation as one pass
 
@@ -218,7 +222,52 @@ Exclude:
 
 ## Open Questions
 
-* M3B MVP 是否只做 Approach A，还是同时预留但不启用 `translation` pass adapter？
+* None for MVP scope. User selected Approach A on 2026-06-22.
+
+## Decision (ADR-lite)
+
+### ADR-003: M3B Starts With Deterministic Lexical Planning
+
+**Context**: M3A1 baseline shows Chinese natural questions over mostly English corpus content return 6/6 empty results with current PostgreSQL `simple` FTS, while English title-style smoke queries hit the expected sources. The project needs a concrete improvement path before introducing translation, embeddings, LLM query planning, or reranking.
+
+**Decision**: M3B MVP implements deterministic query planning and multi-pass lexical retrieval only. It includes entity extraction, a starter technical glossary, corpus/source alias expansion, multi-pass FTS, deterministic fusion, and retrieval-plan debug metadata. It does not implement machine translation, LLM query planning, embeddings, pgvector, reranking, or language-specific analyzer changes.
+
+**Consequences**: This is not the final cross-language retrieval architecture, but it is low-risk, testable, private, and directly targets the current baseline failure. The planned data structures and pass metadata must leave room for later `translation`, `embedding`, and `rerank` pass types.
+
+## Implementation Plan
+
+### PR1: Planner data structures and deterministic planning
+
+* Add retrieval planning models, likely under `src/pkcs/search/planning.py` or `src/pkcs/retrieval/`.
+* Implement `RetrievalPlan`, `RetrievalPass`, and conservative intent labels.
+* Implement ASCII/entity extraction and starter glossary expansion.
+* Add unit tests for example queries from `tests/fixtures/m3_eval_queries.jsonl`.
+
+Verification:
+
+* Planner tests assert pass names, query strings, intent fallback, and no whole-query hardcoding.
+
+### PR2: Multi-pass lexical retrieval and fusion
+
+* Add orchestration that runs planned passes through existing search provider/service boundaries.
+* Deduplicate by `chunk_id` first, then preserve `source_id` diversity signals.
+* Add deterministic fusion metadata showing pass hits and fused score/rank.
+
+Verification:
+
+* Search tests use synthetic fixtures to prove multiple passes can recover expected sources where original query alone fails.
+* M3 baseline report improves empty-result count and top_10 hit rate for current M3 eval fixture.
+
+### PR3: Context Pack integration
+
+* Let `ContextPackService` use planned/fused retrieval internally while preserving the existing MCP/CLI outward contract.
+* Add retrieval plan details to Context Pack response/Markdown only as additive fields/sections.
+* Preserve `read_source` traceability for every evidence item.
+
+Verification:
+
+* Context Pack tests assert evidence remains traceable and `retrieval_plan` includes pass/fusion metadata.
+* Full Docker-backed pytest passes.
 
 ## Definition of Done
 
@@ -226,4 +275,3 @@ Exclude:
 * Implementation PR must include tests for planning output, multi-pass fusion, and M3 eval improvement.
 * Docker-backed tests pass.
 * No search evidence traceability regression.
-
