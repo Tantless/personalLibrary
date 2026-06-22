@@ -46,9 +46,9 @@
 * [x] M3B 设计明确 `RetrievalPlan` 和 `RetrievalPass` 的字段。
 * [x] M3B 设计明确 first-pass lexical planner 的规则来源：entity extractor、glossary、source alias。
 * [x] M3B 设计明确 fusion 方法和去重 key。
-* [ ] M3B 设计明确哪些功能延期到 semantic/vector 阶段。
+* [x] M3B 设计明确哪些功能延期到 semantic/vector 阶段。
 * [x] 用户确认 M3B MVP 范围。
-* [ ] 实现阶段必须跑 M3A1 baseline，对比 top_10 hit / context_support / empty_result_count。
+* [x] 实现阶段必须跑 M3A1 baseline，对比 top_10 hit / context_support / empty_result_count。
 
 ## Technical Approach
 
@@ -284,6 +284,17 @@ Verification:
 
 * Context Pack tests assert evidence remains traceable and `retrieval_plan` includes pass/fusion metadata.
 * Full Docker-backed pytest passes.
+
+Status:
+
+* Completed on 2026-06-22 in `src/pkcs/context_pack/service.py`.
+* `ContextPackService.from_settings()` now uses `PlannedSearchService`; constructor injection still supports simple `SearchService` tests.
+* Context Pack `retrieval_plan` now includes additive `query_plan`, `pass_runs`, and `fusion` fields when planned search is used.
+* Current local M3B evaluator comparison on 2026-06-22 with `PlannedSearchService` + planned Context Pack:
+  * top_1/top_5/top_10 hit rate: 1.0.
+  * context_support_rate: 1.0.
+  * traceability_rate: 1.0.
+  * empty_result_count: 0/6.
 
 ## Definition of Done
 

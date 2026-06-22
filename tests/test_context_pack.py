@@ -12,7 +12,12 @@ from pkcs.context_pack import ContextPackService
 from pkcs.ingest import IngestService
 from pkcs.mcp.server import create_mcp_server
 from pkcs.reader import ReadSourceService
-from pkcs.search import PostgresFTSSearchProvider, SearchService
+from pkcs.search import (
+    PlannedSearchService,
+    PostgresFTSSearchProvider,
+    PostgresSourceAliasProvider,
+    SearchService,
+)
 from pkcs.storage.raw_archive import RawArchiveWriter
 
 
@@ -41,6 +46,26 @@ def make_context_service(
     return ContextPackService(
         search_service=make_search_service(db_session),
         read_source_service=ReadSourceService(session_factory=lambda: nullcontext(db_session)),
+        default_top_k=10,
+        max_evidence=max_evidence,
+        max_evidence_per_source=max_evidence_per_source,
+    )
+
+
+def make_planned_context_service(
+    db_session,
+    *,
+    max_evidence: int = 10,
+    max_evidence_per_source: int = 3,
+) -> ContextPackService:
+    session_factory = lambda: nullcontext(db_session)
+    return ContextPackService(
+        search_service=PlannedSearchService(
+            provider=PostgresFTSSearchProvider(session_factory=session_factory),
+            source_alias_provider=PostgresSourceAliasProvider(session_factory=session_factory),
+            default_top_k=10,
+        ),
+        read_source_service=ReadSourceService(session_factory=session_factory),
         default_top_k=10,
         max_evidence=max_evidence,
         max_evidence_per_source=max_evidence_per_source,
@@ -143,6 +168,48 @@ def test_context_pack_no_results_returns_empty_evidence_with_caveats(db_session)
     assert response.followup_read_suggestions == []
     assert "No sources matched the query." in response.context_pack_markdown
     assert "## Conflicts / Caveats" in response.context_pack_markdown
+
+
+def test_context_pack_uses_planned_search_for_mixed_language_query(db_session, tmp_path) -> None:
+    token = uuid4().hex
+    source_path = tmp_path / "agents-tools.md"
+    source_path.write_text(
+        "# OpenAI Agents Python: Tools docs\n\n"
+        f"Function tools let agents invoke Python callables. Unique token {token}.\n",
+        encoding="utf-8",
+    )
+    canonical_key = f"document:context-planned-tools-{token}"
+    report = make_ingest_service(db_session, tmp_path / "raw").ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=canonical_key,
+    )
+    service = make_planned_context_service(db_session)
+
+    response = service.get_context_pack(
+        query="Agents SDK 如何处理工具调用？",
+        canonical_key=canonical_key,
+        top_k=5,
+    )
+
+    assert response.evidence
+    assert response.evidence[0].source_id == report.source_id
+    assert "Function tools" in response.evidence[0].content
+    assert response.retrieval_plan["provider"] == "postgres_fts_planned"
+    assert response.retrieval_plan["fusion"] == "reciprocal_rank_v1"
+    assert response.retrieval_plan["query_plan"]["intent"] == "official_doc_lookup"
+    assert {item["name"] for item in response.retrieval_plan["pass_runs"]} >= {
+        "original",
+        "source_alias",
+        "combined",
+    }
+    assert "Pass source_alias" in response.context_pack_markdown
+
+    fragment = ReadSourceService(session_factory=lambda: nullcontext(db_session)).read_source(
+        chunk_id=response.evidence[0].chunk_id,
+    )
+    assert fragment.source.source_id == response.evidence[0].source_id
+    assert fragment.locator == response.evidence[0].locator
 
 
 def test_context_pack_hydrates_linked_markdown_artifacts(db_session, tmp_path) -> None:

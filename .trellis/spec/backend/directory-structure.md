@@ -61,7 +61,7 @@ src/pkcs/
 - Search providers own retrieval implementation details; interface layers and future Context Pack code call `SearchService`.
 - PostgreSQL FTS search includes `sources.title` alongside chunk title/content so source-alias queries can recover chunks whose local chunk headings omit the source title.
 - Reader services own source/version/chunk lookup and Raw Archive line slicing; interface layers call `ReadSourceService`.
-- Context Pack services own retrieval orchestration, lightweight artifact hydration, and Markdown rendering; they call `SearchService` and `ReadSourceService`, and use artifact repositories only to hydrate already-selected evidence.
+- Context Pack services own retrieval orchestration, lightweight artifact hydration, and Markdown rendering; the default settings path uses `PlannedSearchService` plus `ReadSourceService`, and tests may still inject `SearchService` for simple-search coverage. Context Pack code uses artifact repositories only to hydrate already-selected evidence.
 - Eval modules own local query-set parsing and quality report calculation. They call `SearchService` and `ContextPackService` instead of duplicating retrieval or evidence assembly logic.
 - Eval fixtures committed under `tests/fixtures/` must be synthetic or public-reference metadata only. Private corpus source files and local baseline run outputs stay under gitignored `data/private/`.
 - Retrieval planning belongs in `src/pkcs/search/planning.py`. It converts a user query into a `RetrievalPlan` with named passes, intent, fusion method, and debug metadata; it must not execute search SQL or read/write database rows.
@@ -85,6 +85,7 @@ src/pkcs/
 | New planned search fusion behavior | Assert source-title matching, pass runs, fused result metadata, and pass-error continuation in `tests/test_planned_search.py` |
 | New reader result field | Assert the field in service and interface tests |
 | New Context Pack field | Assert the field in service and interface tests |
+| New Context Pack retrieval path | Assert `retrieval_plan.query_plan`, `retrieval_plan.pass_runs`, evidence traceability, and Markdown retrieval summary in `tests/test_context_pack.py` |
 | New eval row/report field | Assert loader validation and report shape in `tests/test_m3_eval.py` |
 
 ### 5. Good/Base/Bad Cases

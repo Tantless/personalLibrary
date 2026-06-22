@@ -11,7 +11,7 @@ from pkcs.context_pack.models import (
 from pkcs.db.models import ImageArtifact, TableArtifact
 from pkcs.db.repositories import ImageArtifactRepository, TableArtifactRepository
 from pkcs.reader import ReadSourceService
-from pkcs.search import SearchService
+from pkcs.search import PlannedSearchService, SearchService
 from pkcs.search.models import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class ContextPackService:
     def __init__(
         self,
         *,
-        search_service: SearchService,
+        search_service: SearchService | PlannedSearchService,
         read_source_service: ReadSourceService,
         default_top_k: int,
         max_evidence: int,
@@ -41,7 +41,7 @@ class ContextPackService:
     def from_settings(cls, settings: Settings | None = None) -> "ContextPackService":
         resolved_settings = settings or get_settings()
         return cls(
-            search_service=SearchService.from_settings(resolved_settings),
+            search_service=PlannedSearchService.from_settings(resolved_settings),
             read_source_service=ReadSourceService.from_settings(resolved_settings),
             default_top_k=resolved_settings.default_top_k,
             max_evidence=resolved_settings.context_pack_max_evidence,
@@ -76,16 +76,11 @@ class ContextPackService:
         evidence = self._read_evidence(selected_results)
         sources = self._build_sources(evidence)
         followups = self._build_followups(evidence)
-        retrieval_plan = {
-            "provider": "postgres_fts",
-            "search_top_k": search_top_k,
-            "max_evidence": self.max_evidence,
-            "max_evidence_per_source": self.max_evidence_per_source,
-            "budget_tokens": budget_tokens,
-            "budget_is_soft_limit": True,
-            "selection": "search_top_k + chunk deduplication + per-source evidence cap",
-            "conflict_detection": "not_performed_in_mvp",
-        }
+        retrieval_plan = self._build_retrieval_plan(
+            search_response=search_response,
+            search_top_k=search_top_k,
+            budget_tokens=budget_tokens,
+        )
         markdown = self._render_markdown(
             query=normalized_query,
             retrieval_plan=retrieval_plan,
@@ -111,6 +106,32 @@ class ContextPackService:
             followup_read_suggestions=followups,
             context_pack_markdown=markdown,
         )
+
+    def _build_retrieval_plan(
+        self,
+        *,
+        search_response,
+        search_top_k: int,
+        budget_tokens: int | None,
+    ) -> dict:
+        query_plan = getattr(search_response, "retrieval_plan", None)
+        pass_runs = getattr(search_response, "pass_runs", None)
+        retrieval_plan = {
+            "provider": "postgres_fts_planned" if query_plan is not None else "postgres_fts",
+            "search_top_k": search_top_k,
+            "max_evidence": self.max_evidence,
+            "max_evidence_per_source": self.max_evidence_per_source,
+            "budget_tokens": budget_tokens,
+            "budget_is_soft_limit": True,
+            "selection": "search_top_k + chunk deduplication + per-source evidence cap",
+            "conflict_detection": "not_performed_in_mvp",
+        }
+        if query_plan is not None:
+            retrieval_plan["query_plan"] = query_plan.to_dict()
+            retrieval_plan["fusion"] = query_plan.fusion
+        if pass_runs is not None:
+            retrieval_plan["pass_runs"] = [item.to_dict() for item in pass_runs]
+        return retrieval_plan
 
     def _select_evidence(self, results: list[SearchResult]) -> list[SearchResult]:
         selected: list[SearchResult] = []
@@ -302,9 +323,16 @@ class ContextPackService:
             f"- Evidence cap: {retrieval_plan['max_evidence']}",
             f"- Per-source evidence cap: {retrieval_plan['max_evidence_per_source']}",
             "- Budget: soft limit; no exact tokenizer is used.",
-            "",
-            "## Sources",
         ]
+        if "query_plan" in retrieval_plan:
+            query_plan = retrieval_plan["query_plan"]
+            sections.append(f"- Intent: {query_plan['intent']}")
+            sections.append(f"- Fusion: {retrieval_plan['fusion']}")
+            for item in retrieval_plan.get("pass_runs", []):
+                sections.append(
+                    f"- Pass {item['name']}: results={item['result_count']}, error={item['error_type'] or 'none'}"
+                )
+        sections.extend(["", "## Sources"])
         if sources:
             for source in sources:
                 sections.append(

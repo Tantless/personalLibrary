@@ -60,15 +60,24 @@ def test_planned_search_recovers_source_from_mixed_language_query(db_session, tm
         encoding="utf-8",
     )
     ingest = make_ingest_service(db_session, tmp_path / "raw")
+    canonical_key = f"document:planned-tools-{token}"
     report = ingest.ingest_source(
         path=source_path,
         knowledge_type="document",
-        canonical_key=f"document:planned-tools-{token}",
+        canonical_key=canonical_key,
     )
     query = "Agents SDK 如何处理工具调用？"
 
-    baseline = make_search_service(db_session).search_knowledge(query=query, top_k=5)
-    planned = make_planned_search_service(db_session).search_knowledge(query=query, top_k=5)
+    baseline = make_search_service(db_session).search_knowledge(
+        query=query,
+        canonical_key=canonical_key,
+        top_k=5,
+    )
+    planned = make_planned_search_service(db_session).search_knowledge(
+        query=query,
+        canonical_key=canonical_key,
+        top_k=5,
+    )
 
     assert report.source_id not in {result.source_id for result in baseline.results}
     assert planned.results
