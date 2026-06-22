@@ -95,3 +95,5 @@ For M3 eval baseline work, keep report calculation separate from retrieval chang
 For M3C eval schema work, keep v1 fixture rows backward-compatible and validate v2 diagnostic metadata in `tests/test_m3_eval.py` without adding expanded diagnostic queries or changing retrieval behavior in the same PR.
 
 For M3C comparison report work, use fake service tests for summary math, pass diagnostics, failure classes, noisy result counts, source concentration counts, and JSON writing. Do not change `SearchService`, `PlannedSearchService`, planner rules, or Context Pack selection in the comparison-report PR.
+
+For future multilingual retrieval changes, first create or run an M3 comparison report that includes locked regression rows and diagnostic rows. Translation, embedding, semantic, pgvector, OpenSearch, or reranker work must document quality delta, locked-regression preservation, must-not/noise impact, latency or cost, privacy behavior, reindex path, and rollback before becoming a retained dependency or default path.

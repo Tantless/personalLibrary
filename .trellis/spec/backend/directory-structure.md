@@ -65,6 +65,7 @@ src/pkcs/
 - Eval modules own local query-set parsing and quality report calculation. They call `SearchService` and `ContextPackService` instead of duplicating retrieval or evidence assembly logic.
 - M3 eval schema v2 rows may add `suite`, `language`, `query_style`, `expected_intent`, `expected_pass_names`, and `diagnostic_tags`; old rows must keep loading, default `suite` to `locked_regression`, and default `expected_intent` to `query_type`.
 - M3 comparison reports compare `simple_search`, `planned_search`, and `planned_context_pack`; pass diagnostics must be derived from `planned_retrieval.pass_hits` and planned `pass_runs`, not from hard-coded eval query text.
+- Future translation, embedding, semantic, or rerank retrieval must enter as optional planned retrieval passes or `SearchProvider`-level adapters. They must preserve `SearchResult` references to `source_id`, `version_id`, `chunk_id`, `canonical_key`, and locator-backed citations.
 - Eval fixtures committed under `tests/fixtures/` must be synthetic or public-reference metadata only. Private corpus source files and local baseline run outputs stay under gitignored `data/private/`.
 - Retrieval planning belongs in `src/pkcs/search/planning.py`. It converts a user query into a `RetrievalPlan` with named passes, intent, fusion method, and debug metadata; it must not execute search SQL or read/write database rows.
 - Deterministic query planning may use reusable entity extraction, glossary terms, and source aliases, but must not map whole eval questions directly to source-specific queries.

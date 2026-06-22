@@ -372,6 +372,8 @@ Fusion v1:
 
 ### M3D: Context Pack v1
 
+2026-06-22 sequencing note: after M3C, the immediate follow-up is the expanded diagnostic query-set handoff documented in `.trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/m3d-diagnostic-query-set-handoff.md`. This earlier "M3D: Context Pack v1" label should be treated as a later Context Pack selection/rendering task until diagnostic coverage exists.
+
 Additive response fields:
 
 * `retrieval_plan.intent`

@@ -289,7 +289,15 @@ Verification:
 * Trellis PRD/spec updated.
 * No runtime behavior change.
 
-## Decision (ADR-lite draft)
+Status on 2026-06-22:
+
+* Added `multilingual-roadmap-adr.md` with accepted entry criteria for deterministic lexical hardening, query-only translation adapter, and semantic/hybrid retrieval.
+* Added `m3d-diagnostic-query-set-handoff.md` with the next task's fixture shape, query matrix, report flow, acceptance criteria, and post-report decision rules.
+* Clarified that the immediate follow-up `M3D` means the expanded diagnostic query-set task; the older parent-plan label "M3D Context Pack v1" should be revisited after diagnostic coverage exists.
+* Updated backend specs so future translation/embedding/rerank work must enter as optional retrieval passes or provider adapters and must prove quality, cost, privacy, reindex, and rollback behavior before becoming a default path.
+* Verified with `docker compose ps postgres`, `uv run alembic upgrade head`, `uv run pytest`, and `git diff --check`.
+
+## Decision (ADR-lite)
 
 ### ADR-004: M3C Uses Eval Expansion Before More Retrieval Complexity
 
@@ -298,6 +306,10 @@ Verification:
 **Decision**: M3C implements eval schema v2 and planned-vs-simple diagnostics first, while deferring the first expanded diagnostic query set to a follow-up M3D task. Semantic/hybrid retrieval remains deferred until the diagnostic suite shows repeated lexical failure classes that cannot be addressed by source aliases, glossary, or evidence selection changes.
 
 **Consequences**: M3C may not immediately improve user-facing recall or broaden query coverage, but it creates the measurement layer needed to make future retrieval changes and query-set expansion defensible.
+
+Full ADR: `multilingual-roadmap-adr.md`.
+
+M3D handoff: `m3d-diagnostic-query-set-handoff.md`.
 
 ## Open Questions
 
@@ -326,7 +338,10 @@ Files inspected:
 * `.trellis/tasks/06-16-06-16-pkcs-m3-retrieval-context-pack-design/prd.md`
 * `.trellis/tasks/06-22-06-22-pkcs-m3a1-quality-baseline/prd.md`
 * `.trellis/tasks/archive/2026-06/06-22-06-22-pkcs-m3b-mixed-language-query-planner/prd.md`
+* `.trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/multilingual-roadmap-adr.md`
+* `.trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/m3d-diagnostic-query-set-handoff.md`
 
 Current private report:
 
 * `data/private/eval-runs/m3a1-baseline-20260622-093935.json`
+* `data/private/eval-runs/m3c-comparison-pr2-20260622.json`

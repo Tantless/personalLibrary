@@ -3,7 +3,7 @@
   "name": "pkcs-m3c-retrieval-quality-validation",
   "title": "brainstorm: PKCS M3C retrieval quality validation and multilingual roadmap",
   "description": "Design the post-M3B validation and long-term multilingual retrieval roadmap: expand eval coverage, compare planned retrieval quality, and define criteria for future semantic/hybrid retrieval.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "backend",
   "scope": null,
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "tantless",
   "assignee": "tantless",
   "createdAt": "2026-06-22",
-  "completedAt": null,
+  "completedAt": "2026-06-22",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 3,
+  "current_phase": 6,
   "next_action": [
     {
       "phase": 1,
@@ -49,6 +49,9 @@
   "parent": "06-16-06-16-pkcs-m3-retrieval-context-pack-design",
   "relatedFiles": [
     ".trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/prd.md",
+    ".trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/multilingual-roadmap-adr.md",
+    ".trellis/tasks/06-22-pkcs-m3c-retrieval-quality-validation/m3d-diagnostic-query-set-handoff.md",
+    ".trellis/tasks/06-16-06-16-pkcs-m3-retrieval-context-pack-design/prd.md",
     "src/pkcs/eval/models.py",
     "src/pkcs/eval/__init__.py",
     "src/pkcs/eval/m3_baseline.py",
@@ -61,14 +64,14 @@
     ".trellis/spec/backend/directory-structure.md",
     ".trellis/spec/backend/quality-guidelines.md"
   ],
-  "notes": "M3C design started on 2026-06-22 after M3B completion. User selected MVP option 2: implement eval schema v2 plus simple-vs-planned comparator/report first, and defer the first expanded diagnostic query set to a follow-up task. Semantic/hybrid retrieval remains deferred until diagnostics show repeated lexical failure classes. PR1 schema v2 is implemented and verified. PR2 comparison report is implemented and verified: it compares simple search, planned search, and planned Context Pack, reports pass diagnostics and failure classes, and generated a private smoke report at data/private/eval-runs/m3c-comparison-pr2-20260622.json.",
+  "notes": "M3C completed on 2026-06-22 after M3B completion. User selected MVP option 2: implement eval schema v2 plus simple-vs-planned comparator/report first, and defer the first expanded diagnostic query set to a follow-up task. PR1 schema v2 is implemented and verified. PR2 comparison report is implemented and verified: it compares simple search, planned search, and planned Context Pack, reports pass diagnostics and failure classes, and generated a private smoke report at data/private/eval-runs/m3c-comparison-pr2-20260622.json. PR3 documented and verified the multilingual roadmap ADR and M3D diagnostic query-set handoff; translation, LLM planner, embedding, pgvector, reranker, and language analyzer work remain deferred until diagnostics prove the need.",
   "meta": {
     "recommended_approach": "eval_expansion_plus_comparator_first",
     "confirmed_approach": "schema_and_comparator_first",
     "confirmed_at": "2026-06-22",
     "mvp_includes_expanded_diagnostic_queries": false,
     "latest_private_report": "data/private/eval-runs/m3c-comparison-pr2-20260622.json",
-    "next_pr_sized_step": "PR3 multilingual roadmap ADR and M3D handoff",
+    "next_pr_sized_step": "M3D expanded diagnostic query set",
     "follow_up": "first_expanded_diagnostic_query_set",
     "deferred": [
       "first_expanded_diagnostic_query_set",
