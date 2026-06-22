@@ -46,7 +46,8 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "06-22-06-22-pkcs-m3a1-quality-baseline"
+    "06-22-06-22-pkcs-m3a1-quality-baseline",
+    "06-22-06-22-pkcs-m3b-mixed-language-query-planner"
   ],
   "parent": null,
   "relatedFiles": [

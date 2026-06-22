@@ -1,0 +1,63 @@
+{
+  "id": "06-22-pkcs-m3b-mixed-language-query-planner",
+  "name": "06-22-pkcs-m3b-mixed-language-query-planner",
+  "title": "brainstorm: PKCS M3B mixed-language query planner",
+  "description": "Plan M3B query planning and multi-pass lexical retrieval for mixed-language queries before implementing retrieval behavior changes.",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tantless",
+  "assignee": "tantless",
+  "createdAt": "2026-06-22",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 1,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "06-16-06-16-pkcs-m3-retrieval-context-pack-design",
+  "relatedFiles": [
+    ".trellis/tasks/06-22-06-22-pkcs-m3b-mixed-language-query-planner/prd.md",
+    ".trellis/tasks/06-22-06-22-pkcs-m3a1-quality-baseline/implementation-result.md",
+    "src/pkcs/eval/m3_baseline.py",
+    "tests/fixtures/m3_eval_queries.jsonl",
+    "src/pkcs/search/",
+    "src/pkcs/context_pack/"
+  ],
+  "notes": "M3B planning started. M3A1 baseline shows Chinese natural no-marker queries produce 6/6 empty results against mostly English corpus content, while English title-style smoke queries hit expected sources. Recommended M3B MVP is deterministic query planning plus multi-pass lexical retrieval/fusion, with semantic/vector search deferred.",
+  "meta": {
+    "recommended_approach": "deterministic_lexical_planner_first",
+    "open_question": "Whether M3B MVP should only implement deterministic lexical planning, or also reserve a disabled translation pass adapter."
+  }
+}
