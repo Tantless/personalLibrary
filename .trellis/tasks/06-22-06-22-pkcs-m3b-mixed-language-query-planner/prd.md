@@ -45,7 +45,7 @@
 
 * [x] M3B 设计明确 `RetrievalPlan` 和 `RetrievalPass` 的字段。
 * [x] M3B 设计明确 first-pass lexical planner 的规则来源：entity extractor、glossary、source alias。
-* [ ] M3B 设计明确 fusion 方法和去重 key。
+* [x] M3B 设计明确 fusion 方法和去重 key。
 * [ ] M3B 设计明确哪些功能延期到 semantic/vector 阶段。
 * [x] 用户确认 M3B MVP 范围。
 * [ ] 实现阶段必须跑 M3A1 baseline，对比 top_10 hit / context_support / empty_result_count。
@@ -84,9 +84,9 @@ Planned output:
   "passes": [
     {"name": "original", "query": "Agents SDK 如何处理工具调用？"},
     {"name": "ascii_entity", "query": "Agents SDK"},
-    {"name": "glossary_expansion", "query": "tools function tools tool calling function calling"},
+    {"name": "glossary_expansion", "query": "tools OR \"function tools\" OR \"tool calling\" OR \"function calling\""},
     {"name": "source_alias", "query": "OpenAI Agents Python Tools docs"},
-    {"name": "combined", "query": "OpenAI Agents Python tools function tools"}
+    {"name": "combined", "query": "\"OpenAI Agents Python Tools docs\" OR \"Agents SDK\" OR tools OR \"function tools\""}
   ],
   "fusion": "reciprocal_rank_v1"
 }
@@ -263,6 +263,16 @@ Verification:
 
 * Search tests use synthetic fixtures to prove multiple passes can recover expected sources where original query alone fails.
 * M3 baseline report improves empty-result count and top_10 hit rate for current M3 eval fixture.
+
+Status:
+
+* Completed on 2026-06-22 in `src/pkcs/search/planned.py`.
+* Added DB-backed `PostgresSourceAliasProvider` and source-title-aware FTS matching.
+* Fusion method is `reciprocal_rank_v1`; dedup key is `chunk_id`; result metadata records pass hits under `metadata["planned_retrieval"]`.
+* Current local M3 eval comparison on 2026-06-22:
+  * simple `SearchService`: top_10 hit rate 0.0, empty_result_count 6/6.
+  * `PlannedSearchService`: top_10 hit rate 1.0, top_1 hit rate 1.0, empty_result_count 0/6.
+  * Context Pack support still remains 0.0 until PR3 wires planned search into `ContextPackService`.
 
 ### PR3: Context Pack integration
 

@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from pkcs.db.session import create_session_factory
+from pkcs.search.planning import SourceAlias, source_alias_from_metadata
 from pkcs.search.models import SearchCitation, SearchResult
 from pkcs.source_metadata import knowledge_type_code_for_name, knowledge_type_name, normalized_format_name, source_format_name
 
@@ -21,6 +22,17 @@ class SearchProvider(Protocol):
         knowledge_type: str | None = None,
         canonical_key: str | None = None,
     ) -> list[SearchResult]:
+        pass
+
+
+class SourceAliasProvider(Protocol):
+    def list_source_aliases(
+        self,
+        *,
+        knowledge_type: str | None = None,
+        canonical_key: str | None = None,
+        limit: int = 500,
+    ) -> list[SourceAlias]:
         pass
 
 
@@ -62,9 +74,12 @@ class PostgresFTSSearchProvider:
                     'MaxFragments=2, MinWords=4, MaxWords=24'
                 ) as snippet,
                 (
-                    ts_rank_cd(c.search_vector, search_query.ts_query)
+                    ts_rank_cd(
+                        c.search_vector || setweight(to_tsvector('simple', coalesce(s.title, '')), 'A'),
+                        search_query.ts_query
+                    )
                     + case
-                        when to_tsvector('simple', coalesce(c.title, '')) @@ search_query.ts_query
+                        when to_tsvector('simple', concat_ws(' ', c.title, s.title)) @@ search_query.ts_query
                         then 0.5
                         else 0
                       end
@@ -77,7 +92,9 @@ class PostgresFTSSearchProvider:
             from chunks c
             join sources s on s.id = c.source_id
             cross join search_query
-            where c.search_vector @@ search_query.ts_query
+            where (
+                c.search_vector || setweight(to_tsvector('simple', coalesce(s.title, '')), 'A')
+            ) @@ search_query.ts_query
               and (cast(:knowledge_type_code as integer) is null or c.knowledge_type_code = cast(:knowledge_type_code as integer))
               and (cast(:canonical_key as text) is null or s.canonical_key = cast(:canonical_key as text))
             order by score desc, c.created_at asc, c.id asc
@@ -119,3 +136,49 @@ class PostgresFTSSearchProvider:
                 )
             )
         return results
+
+
+class PostgresSourceAliasProvider:
+    def __init__(self, *, session_factory: SessionFactory) -> None:
+        self.session_factory = session_factory
+
+    @classmethod
+    def from_database_url(cls, database_url: str) -> "PostgresSourceAliasProvider":
+        return cls(session_factory=create_session_factory(database_url))
+
+    def list_source_aliases(
+        self,
+        *,
+        knowledge_type: str | None = None,
+        canonical_key: str | None = None,
+        limit: int = 500,
+    ) -> list[SourceAlias]:
+        if limit < 1:
+            return []
+        knowledge_type_code = knowledge_type_code_for_name(knowledge_type) if knowledge_type is not None else None
+        sql = text(
+            """
+            select
+                s.canonical_key as canonical_key,
+                s.title as title
+            from sources s
+            where (cast(:knowledge_type_code as integer) is null or s.knowledge_type_code = cast(:knowledge_type_code as integer))
+              and (cast(:canonical_key as text) is null or s.canonical_key = cast(:canonical_key as text))
+            order by s.updated_at desc, s.id asc
+            limit :limit
+            """
+        )
+        params = {
+            "knowledge_type_code": knowledge_type_code,
+            "canonical_key": canonical_key,
+            "limit": limit,
+        }
+        with self.session_factory() as session:
+            rows = session.execute(sql, params).mappings().all()
+        return [
+            source_alias_from_metadata(
+                title=row["title"],
+                canonical_key=row["canonical_key"],
+            )
+            for row in rows
+        ]

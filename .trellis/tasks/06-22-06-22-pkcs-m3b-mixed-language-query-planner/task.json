@@ -55,10 +55,13 @@
     "src/pkcs/search/",
     "src/pkcs/context_pack/",
     "src/pkcs/search/planning.py",
+    "src/pkcs/search/planned.py",
     "tests/test_search_planning.py",
+    "tests/test_planned_search.py",
+    "tests/test_search.py",
     ".trellis/spec/backend/directory-structure.md"
   ],
-  "notes": "M3B planning scope confirmed by user on 2026-06-22. M3A1 baseline shows Chinese natural no-marker queries produce 6/6 empty results against mostly English corpus content, while English title-style smoke queries hit expected sources. M3B MVP will implement deterministic query planning plus multi-pass lexical retrieval/fusion only; semantic/vector search, translation, LLM planning, and reranking are deferred. PR1 planner contracts and deterministic planning were implemented on 2026-06-22; PR2 multi-pass retrieval/fusion is still pending.",
+  "notes": "M3B planning scope confirmed by user on 2026-06-22. M3A1 baseline shows Chinese natural no-marker queries produce 6/6 empty results against mostly English corpus content, while English title-style smoke queries hit expected sources. M3B MVP will implement deterministic query planning plus multi-pass lexical retrieval/fusion only; semantic/vector search, translation, LLM planning, and reranking are deferred. PR1 planner contracts and deterministic planning were implemented on 2026-06-22. PR2 planned search/fusion was implemented on 2026-06-22; local M3 planned search reached top_10 hit rate 1.0 and empty_result_count 0/6. PR3 Context Pack integration is still pending.",
   "meta": {
     "recommended_approach": "deterministic_lexical_planner_first",
     "confirmed_approach": "deterministic_lexical_planner_first",

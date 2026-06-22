@@ -33,7 +33,7 @@ def test_query_planner_builds_mixed_language_agents_tools_plan() -> None:
     ]
     assert pass_query(plan, PASS_ASCII_ENTITY) == "Agents SDK"
     assert pass_query(plan, PASS_GLOSSARY_EXPANSION) == (
-        "tools function tools tool calling function calling"
+        'tools OR "function tools" OR "tool calling" OR "function calling"'
     )
     assert pass_query(plan, PASS_SOURCE_ALIAS) == "OpenAI Agents Python Tools docs"
     assert "OpenAI Agents Python Tools docs" in pass_query(plan, PASS_COMBINED)

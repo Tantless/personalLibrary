@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 
 from pkcs.cli import app as cli_app
 from pkcs.config import get_settings
+from pkcs.db.models import Source
 from pkcs.ingest import IngestService
 from pkcs.mcp.server import create_mcp_server
 from pkcs.search import PostgresFTSSearchProvider, SearchService
@@ -125,6 +126,33 @@ def test_search_top_k_and_title_boost(db_session, tmp_path) -> None:
     assert len(response.results) == 1
     assert response.results[0].source_id == title_report.source_id
     assert response.results[0].title == f"{suffix} Atlas"
+
+
+def test_search_matches_source_title_when_chunk_text_does_not(db_session, tmp_path) -> None:
+    suffix = uuid4().hex
+    source_path = tmp_path / "source-title-only.md"
+    source_path.write_text(
+        "# Chunk Heading\n\n"
+        "The body intentionally omits the source title lookup phrase.\n",
+        encoding="utf-8",
+    )
+    report = make_ingest_service(db_session, tmp_path / "raw").ingest_source(
+        path=source_path,
+        knowledge_type="document",
+        canonical_key=f"document:source-title-{suffix}",
+    )
+    source = db_session.get(Source, report.source_id)
+    assert source is not None
+    source.title = f"Source Alias Lookup {suffix}"
+    db_session.flush()
+
+    response = make_search_service(db_session).search_knowledge(
+        query=f"Source Alias Lookup {suffix}",
+        top_k=3,
+    )
+
+    assert response.results
+    assert response.results[0].source_id == report.source_id
 
 
 def test_search_no_results_returns_empty_list(db_session) -> None:

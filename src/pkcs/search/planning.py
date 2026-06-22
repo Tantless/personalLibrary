@@ -39,6 +39,19 @@ DEFAULT_TECHNICAL_GLOSSARY: dict[str, tuple[str, ...]] = {
     "文档": ("docs", "documentation"),
 }
 
+SOURCE_ALIAS_STOPWORDS = {
+    "ai",
+    "and",
+    "corpus",
+    "doc",
+    "docs",
+    "document",
+    "documentation",
+    "m3",
+    "on",
+    "the",
+}
+
 
 class QueryPlanningInputError(ValueError):
     pass
@@ -110,6 +123,17 @@ class SourceAliasMatch:
         }
 
 
+def source_alias_from_metadata(*, title: str, canonical_key: str | None = None) -> SourceAlias:
+    aliases = _source_aliases_from_title_and_key(title=title, canonical_key=canonical_key)
+    terms = _source_alias_terms(title=title, canonical_key=canonical_key)
+    return SourceAlias(
+        title=title,
+        aliases=tuple(aliases),
+        terms=tuple(terms),
+        canonical_key=canonical_key,
+    )
+
+
 class QueryPlanner:
     def __init__(
         self,
@@ -163,7 +187,7 @@ class QueryPlanner:
             passes.append(
                 RetrievalPass(
                     name=PASS_GLOSSARY_EXPANSION,
-                    query=" ".join(glossary_terms),
+                    query=_any_term_query(glossary_terms),
                     weight=1.1,
                     metadata={"glossary_matches": _glossary_matches_to_dict(glossary_matches)},
                 )
@@ -294,7 +318,7 @@ def _combined_query(
     )
     if len(parts) <= 1:
         return ""
-    return " ".join(parts)
+    return _any_term_query(parts)
 
 
 def _glossary_matches_to_dict(matches: dict[str, list[str]]) -> list[dict[str, Any]]:
@@ -314,3 +338,61 @@ def _unique_terms(terms: Iterable[object]) -> list[str]:
         seen.add(key)
         unique.append(normalized)
     return unique
+
+
+def _source_aliases_from_title_and_key(*, title: str, canonical_key: str | None) -> list[str]:
+    cleaned_title = _clean_alias_text(title)
+    aliases = [title, cleaned_title]
+    aliases.extend(_colon_title_aliases(title))
+    if canonical_key:
+        aliases.extend(_canonical_key_aliases(canonical_key))
+
+    searchable_text = " ".join(aliases).casefold()
+    if "openai agents python" in searchable_text:
+        aliases.extend(["OpenAI Agents SDK", "Agents SDK"])
+    return _unique_terms(aliases)
+
+
+def _colon_title_aliases(title: str) -> list[str]:
+    parts = [_clean_alias_text(part) for part in title.split(":")]
+    return [part for part in parts if part]
+
+
+def _canonical_key_aliases(canonical_key: str) -> list[str]:
+    tail = canonical_key.split(":")[-1]
+    words = _clean_alias_text(tail).split()
+    aliases = [" ".join(words)] if words else []
+    for size in (1, 2, 3):
+        if len(words) >= size:
+            aliases.append(" ".join(words[-size:]))
+    return aliases
+
+
+def _source_alias_terms(*, title: str, canonical_key: str | None) -> list[str]:
+    text_parts = [_clean_alias_text(title)]
+    if canonical_key:
+        text_parts.append(_clean_alias_text(canonical_key.split(":")[-1]))
+    terms = []
+    for token in " ".join(text_parts).split():
+        if len(token) < 2:
+            continue
+        if token.casefold() in SOURCE_ALIAS_STOPWORDS:
+            continue
+        terms.append(token)
+    return _unique_terms(terms)[:20]
+
+
+def _clean_alias_text(value: str) -> str:
+    return " ".join(re.sub(r"[^A-Za-z0-9+.#]+", " ", value).split())
+
+
+def _any_term_query(terms: Iterable[object]) -> str:
+    return " OR ".join(_websearch_term(term) for term in _unique_terms(terms))
+
+
+def _websearch_term(term: object) -> str:
+    value = str(term).replace('"', " ").strip()
+    value = " ".join(value.split())
+    if " " in value:
+        return f'"{value}"'
+    return value
